@@ -1,0 +1,23 @@
+{
+  "name": "pdf2ai",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "PDF to AI-ready Markdown pipeline dengan OCR, antrean, dan API",
+  "scripts": {
+    "start": "node src/start.js",
+    "server": "node src/server.js",
+    "cli": "node src/app.js",
+    "setup:ocr": "node scripts/setup-ocr.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@fastify/multipart": "10.1.0",
+    "@fastify/static": "10.1.2",
+    "@opendataloader/pdf": "2.5.0",
+    "fastify": "5.10.0"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  }
+}

@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="PDF2AI mengubah PDF menjadi Markdown terstruktur yang siap digunakan oleh AI."
+    />
+    <title>PDF2AI — PDF to AI Ready</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/app.js" type="module"></script>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <a class="brand" href="/" aria-label="PDF2AI">
+          <span class="brand-mark" aria-hidden="true">P2</span>
+          <span class="brand-copy">
+            <strong>PDF2AI</strong>
+            <small>PDF to AI Ready</small>
+          </span>
+        </a>
+
+        <div class="service-status" id="service-status" role="status">
+          <span class="status-dot" aria-hidden="true"></span>
+          <span id="service-status-text">Memeriksa mesin…</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="app-shell">
+      <section class="page-heading">
+        <div>
+          <p class="eyebrow">PDF TO AI READY</p>
+          <h1>PDF siap untuk AI.</h1>
+          <p>
+            Ekstrak PDF digital maupun hasil scan menjadi Markdown terstruktur,
+            siap untuk RAG, pencarian, dan automasi.
+          </p>
+        </div>
+        <div class="pipeline-note" aria-label="Informasi pemrosesan">
+          <span class="pipeline-number">AI</span>
+          <div>
+            <strong>OCR + Markdown</strong>
+            <small>Antrean stabil untuk perangkat CPU, tanpa membutuhkan GPU.</small>
+          </div>
+        </div>
+      </section>
+
+      <section class="metrics" aria-label="Ringkasan antrean">
+        <article>
+          <span class="metric-label">Menunggu</span>
+          <strong id="count-queued">0</strong>
+          <small>dokumen dalam antrean</small>
+        </article>
+        <article>
+          <span class="metric-label">Berjalan</span>
+          <strong id="count-processing">0</strong>
+          <small>sedang diproses</small>
+        </article>
+        <article>
+          <span class="metric-label">Selesai</span>
+          <strong id="count-completed">0</strong>
+          <small>Markdown tersedia</small>
+        </article>
+        <article>
+          <span class="metric-label">Gagal</span>
+          <strong id="count-failed">0</strong>
+          <small>perlu diperiksa</small>
+        </article>
+      </section>
+
+      <section class="workspace">
+        <aside class="upload-panel">
+          <div class="panel-heading">
+            <span class="step-label">LANGKAH 1</span>
+            <h2>Tambah dokumen</h2>
+            <p>Pilih beberapa PDF dan masukkan semuanya ke antrean.</p>
+          </div>
+
+          <label class="drop-zone" id="drop-zone" for="file-input">
+            <input
+              id="file-input"
+              type="file"
+              accept="application/pdf,.pdf"
+              multiple
+            />
+            <span class="upload-icon" aria-hidden="true">PDF</span>
+            <strong>Tarik file ke area ini</strong>
+            <span>atau klik untuk memilih dari komputer</span>
+            <small>PDF · maksimum 25 MB per file</small>
+          </label>
+
+          <div class="selection" id="selection" hidden>
+            <div class="selection-header">
+              <strong id="selection-summary"></strong>
+              <button class="text-button" id="clear-selection" type="button">
+                Bersihkan
+              </button>
+            </div>
+            <ul id="selection-list"></ul>
+          </div>
+
+          <button class="primary-button" id="upload-button" type="button" disabled>
+            <span id="upload-button-label">Masukkan ke antrean</span>
+            <span aria-hidden="true">→</span>
+          </button>
+
+          <div class="privacy-note">
+            <span aria-hidden="true"></span>
+            <p>
+              <strong>Data tetap di mesin Anda.</strong>
+              Proses berlanjut meski halaman ditutup.
+            </p>
+          </div>
+        </aside>
+
+        <section class="jobs-panel">
+          <div class="jobs-heading">
+            <div>
+              <span class="step-label">LANGKAH 2</span>
+              <h2>Riwayat dokumen</h2>
+              <p id="last-updated">Status diperbarui otomatis.</p>
+            </div>
+            <button
+              class="icon-button"
+              id="refresh-button"
+              type="button"
+              title="Muat ulang"
+              aria-label="Muat ulang daftar dokumen"
+            >
+              <span aria-hidden="true">↻</span>
+            </button>
+          </div>
+
+          <div class="job-table-head" aria-hidden="true">
+            <span>Dokumen</span>
+            <span>Status</span>
+            <span>Waktu</span>
+            <span>Aksi</span>
+          </div>
+
+          <div class="job-list" id="job-list" aria-live="polite">
+            <div class="empty-state" id="empty-state">
+              <span class="empty-mark" aria-hidden="true">PDF</span>
+              <h3>Belum ada dokumen</h3>
+              <p>PDF yang Anda unggah akan dipantau dari halaman ini.</p>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <dialog class="markdown-dialog" id="markdown-dialog">
+      <div class="dialog-header">
+        <div>
+          <span class="step-label">HASIL DOKUMEN</span>
+          <h2 id="dialog-title">Hasil ekstraksi</h2>
+        </div>
+        <button
+          class="icon-button"
+          id="close-dialog"
+          type="button"
+          aria-label="Tutup hasil dokumen"
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
+
+      <div class="result-toolbar">
+        <div class="result-tabs" role="tablist" aria-label="Jenis hasil dokumen">
+          <button
+            class="result-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="result-pdf-panel"
+            data-result-tab="pdf"
+          >
+            PDF
+          </button>
+          <button
+            class="result-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="result-metadata-panel"
+            data-result-tab="metadata"
+          >
+            Metadata
+          </button>
+          <button
+            class="result-tab active"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="result-markdown-panel"
+            data-result-tab="markdown"
+          >
+            Markdown
+          </button>
+        </div>
+
+        <div class="result-actions">
+          <a class="secondary-button" id="download-pdf" href="#">Unduh PDF</a>
+          <button class="secondary-button" id="copy-markdown" type="button">
+            Salin Markdown
+          </button>
+          <a class="secondary-button" id="download-markdown" href="#">
+            Unduh .md
+          </a>
+        </div>
+      </div>
+
+      <div class="result-panels">
+        <section
+          class="result-panel pdf-panel"
+          id="result-pdf-panel"
+          role="tabpanel"
+          data-result-panel="pdf"
+          hidden
+        >
+          <iframe id="result-pdf-frame" title="Pratinjau file PDF"></iframe>
+        </section>
+        <pre
+          class="result-panel metadata-panel"
+          id="result-metadata-panel"
+          role="tabpanel"
+          data-result-panel="metadata"
+          tabindex="0"
+          hidden
+        ></pre>
+        <pre
+          class="result-panel markdown-panel"
+          id="result-markdown-panel"
+          role="tabpanel"
+          data-result-panel="markdown"
+          tabindex="0"
+        ></pre>
+      </div>
+    </dialog>
+
+    <dialog class="fetch-dialog" id="fetch-dialog">
+      <div class="dialog-header">
+        <div>
+          <span class="step-label">PDF2AI API</span>
+          <h2 id="fetch-dialog-title">Fetch Data</h2>
+        </div>
+        <button
+          class="icon-button"
+          id="close-fetch-dialog"
+          type="button"
+          aria-label="Tutup panduan Fetch Data"
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
+
+      <div class="fetch-dialog-body">
+        <p class="api-intro">
+          Gunakan ID surat berikut untuk memeriksa status, mengambil PDF asli,
+          dan membaca hasil Markdown melalui API.
+        </p>
+
+        <section class="api-id-card" aria-labelledby="job-id-label">
+          <div>
+            <span class="api-field-label" id="job-id-label">ID SURAT</span>
+            <code id="fetch-job-id"></code>
+          </div>
+          <button class="secondary-button" id="copy-job-id" type="button">
+            Salin ID
+          </button>
+        </section>
+
+        <section class="api-endpoints" aria-label="Endpoint surat">
+          <article>
+            <div class="api-endpoint-heading">
+              <span class="api-method">GET · METADATA</span>
+              <button
+                class="endpoint-copy-button"
+                type="button"
+                data-copy-target="fetch-metadata-url"
+                data-copy-label="Link metadata"
+              >
+                Copy Link
+              </button>
+            </div>
+            <code id="fetch-metadata-url"></code>
+          </article>
+          <article>
+            <div class="api-endpoint-heading">
+              <span class="api-method">GET · FILE PDF</span>
+              <button
+                class="endpoint-copy-button"
+                type="button"
+                data-copy-target="fetch-pdf-url"
+                data-copy-label="Link PDF"
+              >
+                Copy Link
+              </button>
+            </div>
+            <code id="fetch-pdf-url"></code>
+          </article>
+          <article>
+            <div class="api-endpoint-heading">
+              <span class="api-method">GET · MARKDOWN</span>
+              <button
+                class="endpoint-copy-button"
+                type="button"
+                data-copy-target="fetch-markdown-url"
+                data-copy-label="Link Markdown"
+              >
+                Copy Link
+              </button>
+            </div>
+            <code id="fetch-markdown-url"></code>
+          </article>
+          <article class="danger-endpoint">
+            <div class="api-endpoint-heading">
+              <span class="api-method">DELETE · HAPUS DATA</span>
+              <button
+                class="endpoint-copy-button"
+                type="button"
+                data-copy-target="fetch-delete-url"
+                data-copy-label="Link hapus"
+              >
+                Copy Link
+              </button>
+            </div>
+            <code id="fetch-delete-url"></code>
+          </article>
+        </section>
+
+        <section class="api-guide">
+          <div>
+            <span class="step-label">CARA MENGAMBIL SURAT</span>
+            <ol>
+              <li>Ambil metadata menggunakan ID surat.</li>
+              <li>Pastikan statusnya sudah <code>completed</code>.</li>
+              <li>Fetch URL PDF dan Markdown dari metadata tersebut.</li>
+              <li>
+                Kirim method <code>DELETE</code> ke URL metadata untuk
+                menghapusnya.
+              </li>
+            </ol>
+            <p class="delete-api-note">
+              Penghapusan hanya berlaku untuk surat selesai atau gagal, dan
+              akan menghapus PDF serta Markdown secara permanen.
+            </p>
+          </div>
+
+          <div class="code-sample">
+            <div class="code-sample-header">
+              <span>JavaScript · Fetch API</span>
+              <button class="code-copy-button" id="copy-fetch-code" type="button">
+                Salin kode
+              </button>
+            </div>
+            <pre id="fetch-code" tabindex="0"></pre>
+          </div>
+        </section>
+      </div>
+
+      <div class="fetch-dialog-actions">
+        <a class="secondary-button" id="fetch-download-pdf" href="#">
+          Unduh PDF
+        </a>
+        <a class="secondary-button" id="fetch-download-markdown" href="#">
+          Unduh Markdown
+        </a>
+      </div>
+    </dialog>
+
+    <div class="toast-region" id="toast-region" aria-live="polite"></div>
+  </body>
+</html>
