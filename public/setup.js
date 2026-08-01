@@ -15,6 +15,10 @@ const copySecret = document.querySelector("#copy-mfa-secret");
 
 let setupToken = "";
 
+function totpDigits(value) {
+  return String(value).replace(/\D/g, "").slice(0, 6);
+}
+
 async function request(path, body) {
   const response = await fetch(path, {
     method: "POST",
@@ -60,7 +64,7 @@ confirmForm.addEventListener("submit", async (event) => {
   try {
     await request("/setup/confirm", {
       setupToken,
-      code: codeInput.value.replace(/\D/g, ""),
+      code: totpDigits(codeInput.value),
     });
     window.location.replace("/");
   } catch (error) {
@@ -74,7 +78,17 @@ confirmForm.addEventListener("submit", async (event) => {
 });
 
 codeInput.addEventListener("input", () => {
-  codeInput.value = codeInput.value.replace(/\D/g, "").slice(0, 6);
+  codeInput.value = totpDigits(codeInput.value);
+});
+
+codeInput.addEventListener("paste", (event) => {
+  const pastedCode = totpDigits(event.clipboardData?.getData("text") ?? "");
+  if (!pastedCode) {
+    return;
+  }
+  event.preventDefault();
+  codeInput.value = pastedCode;
+  codeInput.setSelectionRange(codeInput.value.length, codeInput.value.length);
 });
 
 copySecret.addEventListener("click", async () => {

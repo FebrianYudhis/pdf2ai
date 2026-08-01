@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Dokumentasi HTTP API PDF2AI untuk upload, memantau, dan mengambil hasil ekstraksi PDF."
+      content="Dokumentasi HTTP API PDF2AI untuk upload, pemrosesan PDF, Markdown, dan hasil Tanya AI."
     />
     <title>API Docs — PDF2AI</title>
     <link rel="stylesheet" href="/styles.css" />
@@ -43,16 +43,21 @@
         <p class="docs-sidebar-label">ENDPOINT</p>
         <nav>
           <a href="#health"><span class="nav-method get">GET</span> Health</a>
+          <a href="#ai-models"><span class="nav-method get">GET</span> Model AI</a>
           <a href="#create-job"><span class="nav-method post">POST</span> Buat job</a>
           <a href="#list-jobs"><span class="nav-method get">GET</span> Daftar job</a>
           <a href="#job-status"><span class="nav-method get">GET</span> Status job</a>
           <a href="#job-files"><span class="nav-method get">GET</span> Ambil hasil</a>
+          <a href="#ask-ai-api"><span class="nav-method post">POST</span> Tanya AI</a>
+          <a href="#list-ai-results"><span class="nav-method get">GET</span> Daftar hasil AI</a>
+          <a href="#get-ai-result"><span class="nav-method get">GET</span> Detail hasil AI</a>
           <a href="#delete-job"><span class="nav-method delete">DEL</span> Hapus job</a>
         </nav>
 
         <p class="docs-sidebar-label">REFERENSI</p>
         <nav>
           <a href="#job-model">Model job</a>
+          <a href="#ai-result-model">Model hasil AI</a>
           <a href="#errors">Error &amp; status</a>
         </nav>
       </aside>
@@ -63,8 +68,8 @@
             <p class="eyebrow">HTTP API · VERSION 1</p>
             <h1>Integrasikan PDF2AI.</h1>
             <p>
-              Upload PDF, pantau proses OCR, lalu ambil PDF asli dan Markdown
-              terstruktur dari aplikasi Anda sendiri.
+              Upload PDF, pantau proses OCR, lalu ikuti URL pada response untuk
+              mengambil PDF, Markdown, dan hasil Tanya AI.
             </p>
           </div>
 
@@ -87,7 +92,8 @@
             <strong>Perlu login TOTP.</strong>
             <p>
               Halaman dokumentasi ini hanya dapat dibuka setelah login. Client
-              eksternal memakai API key untuk mengakses endpoint <code>/v1/*</code>.
+              eksternal memakai API key untuk mengakses endpoint terproteksi
+              di bawah prefix <code>/v1/*</code>.
             </p>
           </div>
         </section>
@@ -117,7 +123,7 @@
             </li>
             <li>
               <span>4</span>
-              <div><strong>Ambil hasil</strong><small>Unduh PDF dan Markdown.</small></div>
+              <div><strong>Ikuti URL hasil</strong><small>Ambil PDF, Markdown, atau hasil AI.</small></div>
             </li>
           </ol>
 
@@ -141,7 +147,15 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
 
 # 3. Ambil Markdown setelah status completed
 curl -H "X-API-Key: $PDF2AI_API_KEY" \
-  {{BASE_URL}}/v1/jobs/JOB_ID/markdown</pre>
+  {{BASE_URL}}/v1/jobs/JOB_ID/markdown
+
+# 4. Periksa model yang dapat digunakan
+curl -H "X-API-Key: $PDF2AI_API_KEY" \
+  {{BASE_URL}}/v1/ai/models
+
+# 5. Ambil daftar hasil AI (boleh masih kosong)
+curl -H "X-API-Key: $PDF2AI_API_KEY" \
+  {{BASE_URL}}/v1/jobs/JOB_ID/ai</pre>
           </div>
         </section>
 
@@ -171,7 +185,7 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
             <strong>Jangan taruh API key di frontend publik.</strong>
             <p>
               Simpan sebagai secret atau environment variable pada backend Anda.
-              Endpoint <code>/health</code> adalah satu-satunya endpoint API yang
+              Endpoint <code>/v1/health</code> adalah satu-satunya endpoint API yang
               tidak memerlukan key.
             </p>
           </div>
@@ -180,7 +194,7 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
         <section class="docs-section endpoint-section" id="health">
           <div class="endpoint-title">
             <span class="method-badge get">GET</span>
-            <code>/health</code>
+            <code>/v1/health</code>
             <span class="auth-badge public">PUBLIK</span>
           </div>
           <p>Memeriksa kesiapan API, backend OCR, dan statistik antrean.</p>
@@ -190,7 +204,7 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
               <span>cURL</span>
               <button class="code-copy-button" type="button" data-copy="#health-code">Salin</button>
             </div>
-            <pre id="health-code" data-code tabindex="0">curl {{BASE_URL}}/health</pre>
+            <pre id="health-code" data-code tabindex="0">curl {{BASE_URL}}/v1/health</pre>
           </div>
 
           <details class="response-details">
@@ -207,6 +221,44 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
   }
 }</pre>
           </details>
+        </section>
+
+        <section class="docs-section endpoint-section" id="ai-models">
+          <div class="endpoint-title">
+            <span class="method-badge get">GET</span>
+            <code>/v1/ai/models</code>
+            <span class="auth-badge">API KEY</span>
+          </div>
+          <p>
+            Mengambil daftar model AI yang sudah diimpor dan disimpan melalui
+            dashboard. Endpoint ini tidak menghubungi provider ulang dan tidak
+            mengembalikan Base URL maupun token provider.
+          </p>
+
+          <div class="code-sample docs-code-sample">
+            <div class="code-sample-header">
+              <span>cURL</span>
+              <button class="code-copy-button" type="button" data-copy="#ai-models-code">Salin</button>
+            </div>
+            <pre id="ai-models-code" data-code tabindex="0">curl -H "X-API-Key: $PDF2AI_API_KEY" \
+  {{BASE_URL}}/v1/ai/models</pre>
+          </div>
+
+          <details class="response-details" open>
+            <summary>Contoh response · 200 OK</summary>
+            <pre>{
+  "configured": true,
+  "modelsUrl": "/v1/ai/models",
+  "models": ["model-cepat", "model-teliti"],
+  "defaultModel": "model-teliti",
+  "updatedAt": "2026-08-01T09:00:00.000Z"
+}</pre>
+          </details>
+          <p class="response-note">
+            Jika AI belum dikonfigurasi, response tetap <strong>200 OK</strong>
+            dengan <code>configured: false</code>, daftar kosong, dan
+            <code>defaultModel: null</code>.
+          </p>
         </section>
 
         <section class="docs-section endpoint-section" id="create-job">
@@ -273,7 +325,9 @@ const { job } = await response.json();</pre>
     "completedAt": null,
     "jobUrl": "/v1/jobs/2a6cf34e-7c27-4ba8-afcc-8c91339e3f0c",
     "pdfUrl": "/v1/jobs/2a6cf34e-7c27-4ba8-afcc-8c91339e3f0c/pdf",
-    "markdownUrl": null
+    "markdownUrl": null,
+    "aiModelsUrl": "/v1/ai/models",
+    "aiResultsUrl": "/v1/jobs/2a6cf34e-7c27-4ba8-afcc-8c91339e3f0c/ai"
   }
 }</pre>
           </details>
@@ -321,7 +375,8 @@ const { job } = await response.json();</pre>
           </div>
           <p>
             Mengambil metadata dan status job. Poll endpoint ini sampai status
-            menjadi <code>completed</code> atau <code>failed</code>.
+            menjadi <code>completed</code> atau <code>failed</code>. Gunakan URL
+            pada object job agar client tidak perlu menyusun endpoint turunannya.
           </p>
 
           <div class="code-sample docs-code-sample">
@@ -339,6 +394,28 @@ const { job } = await response.json();</pre>
             <div><span class="job-state completed"></span><strong>completed</strong><small>Hasil tersedia.</small></div>
             <div><span class="job-state failed"></span><strong>failed</strong><small>Lihat field error.</small></div>
           </div>
+
+          <details class="response-details" open>
+            <summary>Contoh response completed · 200 OK</summary>
+            <pre>{
+  "job": {
+    "id": "JOB_ID",
+    "originalName": "document.pdf",
+    "status": "completed",
+    "jobUrl": "/v1/jobs/JOB_ID",
+    "pdfUrl": "/v1/jobs/JOB_ID/pdf",
+    "markdownUrl": "/v1/jobs/JOB_ID/markdown",
+    "aiModelsUrl": "/v1/ai/models",
+    "aiResultsUrl": "/v1/jobs/JOB_ID/ai"
+  }
+}</pre>
+          </details>
+          <p class="response-note">
+            <code>aiModelsUrl</code> menunjuk ke daftar model global yang dapat
+            digunakan untuk Tanya AI.
+            <code>aiResultsUrl</code> selalu tersedia dan mengarah ke koleksi
+            hasil AI milik job. Koleksi dapat kosong jika Tanya AI belum pernah dijalankan.
+          </p>
         </section>
 
         <section class="docs-section endpoint-section" id="job-files">
@@ -372,6 +449,135 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
           </div>
         </section>
 
+        <section class="docs-section endpoint-section" id="ask-ai-api">
+          <div class="endpoint-title">
+            <span class="method-badge post">POST</span>
+            <code>/v1/jobs/:jobId/ai</code>
+            <span class="auth-badge">API KEY</span>
+          </div>
+          <p>
+            Mengirim Markdown dari job selesai ke provider AI yang sudah
+            dikonfigurasi. Model harus berasal dari daftar model yang diimpor
+            melalui dashboard. Request menunggu jawaban provider, lalu hasilnya
+            disimpan secara persisten.
+          </p>
+
+          <div class="parameter-table-wrap">
+            <table class="parameter-table">
+              <thead><tr><th>Field</th><th>Tipe</th><th>Wajib</th><th>Keterangan</th></tr></thead>
+              <tbody>
+                <tr><td><code>model</code></td><td>string</td><td>Ya</td><td>Model yang sudah diimpor.</td></tr>
+                <tr><td><code>message</code></td><td>string</td><td>Ya</td><td>Instruksi atau pertanyaan untuk AI.</td></tr>
+                <tr><td><code>templateId</code></td><td>string | null</td><td>Tidak</td><td>ID template yang dipakai dari dashboard.</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="code-sample docs-code-sample">
+            <div class="code-sample-header">
+              <span>cURL</span>
+              <button class="code-copy-button" type="button" data-copy="#ask-ai-code">Salin</button>
+            </div>
+            <pre id="ask-ai-code" data-code tabindex="0">curl -X POST {{BASE_URL}}/v1/jobs/JOB_ID/ai \
+  -H "X-API-Key: $PDF2AI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "MODEL_ID",
+    "message": "Ringkas dokumen dan tuliskan poin tindakan."
+  }'</pre>
+          </div>
+
+          <details class="response-details" open>
+            <summary>Bentuk response · 201 Created</summary>
+            <pre>{
+  "result": {
+    "id": "HASIL_AI_ID",
+    "jobId": "JOB_ID",
+    "model": "MODEL_ID",
+    "prompt": "Ringkas dokumen dan tuliskan poin tindakan.",
+    "content": "Jawaban dari AI...",
+    "createdAt": "2026-08-01T09:00:00.000Z",
+    "jobUrl": "/v1/jobs/JOB_ID",
+    "aiModelsUrl": "/v1/ai/models",
+    "aiResultsUrl": "/v1/jobs/JOB_ID/ai",
+    "resultUrl": "/v1/jobs/JOB_ID/ai/HASIL_AI_ID"
+  }
+}</pre>
+          </details>
+          <p class="response-note">
+            Header <code>Location</code> dan field <code>resultUrl</code> menunjuk
+            ke hasil AI yang baru dibuat.
+          </p>
+        </section>
+
+        <section class="docs-section endpoint-section" id="list-ai-results">
+          <div class="endpoint-title">
+            <span class="method-badge get">GET</span>
+            <code>/v1/jobs/:jobId/ai</code>
+            <span class="auth-badge">API KEY</span>
+          </div>
+          <p>
+            Mengambil seluruh hasil Tanya AI milik sebuah job, urutan terbaru.
+            URL endpoint ini tersedia sebagai <code>job.aiResultsUrl</code> pada
+            response job.
+          </p>
+
+          <div class="code-sample docs-code-sample">
+            <div class="code-sample-header">
+              <span>cURL</span>
+              <button class="code-copy-button" type="button" data-copy="#list-ai-results-code">Salin</button>
+            </div>
+            <pre id="list-ai-results-code" data-code tabindex="0">curl -H "X-API-Key: $PDF2AI_API_KEY" \
+  "{{BASE_URL}}/v1/jobs/JOB_ID/ai"</pre>
+          </div>
+
+          <details class="response-details" open>
+            <summary>Bentuk response · 200 OK</summary>
+            <pre>{
+  "jobUrl": "/v1/jobs/JOB_ID",
+  "aiResultsUrl": "/v1/jobs/JOB_ID/ai",
+  "results": [
+    {
+      "id": "HASIL_AI_ID",
+      "jobId": "JOB_ID",
+      "content": "Jawaban dari AI...",
+      "jobUrl": "/v1/jobs/JOB_ID",
+      "aiModelsUrl": "/v1/ai/models",
+      "aiResultsUrl": "/v1/jobs/JOB_ID/ai",
+      "resultUrl": "/v1/jobs/JOB_ID/ai/HASIL_AI_ID"
+    }
+  ]
+}</pre>
+          </details>
+        </section>
+
+        <section class="docs-section endpoint-section" id="get-ai-result">
+          <div class="endpoint-title">
+            <span class="method-badge get">GET</span>
+            <code>/v1/jobs/:jobId/ai/:aiId</code>
+            <span class="auth-badge">API KEY</span>
+          </div>
+          <p>
+            Mengambil satu hasil AI. Gunakan <code>resultUrl</code> dari response
+            pembuatan atau daftar hasil agar kombinasi <code>jobId</code> dan
+            <code>aiId</code> selalu benar.
+          </p>
+
+          <div class="code-sample docs-code-sample">
+            <div class="code-sample-header">
+              <span>cURL</span>
+              <button class="code-copy-button" type="button" data-copy="#get-ai-result-code">Salin</button>
+            </div>
+            <pre id="get-ai-result-code" data-code tabindex="0">curl -H "X-API-Key: $PDF2AI_API_KEY" \
+  {{BASE_URL}}/v1/jobs/JOB_ID/ai/HASIL_AI_ID</pre>
+          </div>
+
+          <p class="response-note">
+            Response berbentuk <code>{ "result": { ... } }</code>. Jika hasil
+            bukan milik job tersebut, server mengembalikan <strong>404 Not Found</strong>.
+          </p>
+        </section>
+
         <section class="docs-section endpoint-section" id="delete-job">
           <div class="endpoint-title">
             <span class="method-badge delete">DELETE</span>
@@ -379,8 +585,9 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
             <span class="auth-badge">API KEY</span>
           </div>
           <p>
-            Menghapus PDF, metadata, dan Markdown secara permanen. Hanya job
-            berstatus <code>completed</code> atau <code>failed</code> yang dapat dihapus.
+            Menghapus PDF, metadata, Markdown, dan seluruh hasil AI secara permanen.
+            Hanya job berstatus <code>completed</code> atau <code>failed</code> yang
+            dapat dihapus.
           </p>
 
           <div class="code-sample docs-code-sample">
@@ -419,6 +626,41 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
                 <tr><td><code>jobUrl</code></td><td>string</td><td>URL relatif metadata job.</td></tr>
                 <tr><td><code>pdfUrl</code></td><td>string</td><td>URL relatif PDF sumber.</td></tr>
                 <tr><td><code>markdownUrl</code></td><td>string | null</td><td>Tersedia setelah status <code>completed</code>.</td></tr>
+                <tr><td><code>aiModelsUrl</code></td><td>string</td><td>URL relatif daftar model AI yang dapat digunakan.</td></tr>
+                <tr><td><code>aiResultsUrl</code></td><td>string</td><td>URL relatif daftar dan pembuatan hasil AI milik job.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="docs-section" id="ai-result-model">
+          <div class="docs-section-heading compact">
+            <span class="docs-step">04</span>
+            <div>
+              <p class="eyebrow">DATA MODEL</p>
+              <h2>Object hasil AI</h2>
+            </div>
+          </div>
+
+          <div class="parameter-table-wrap">
+            <table class="parameter-table model-table">
+              <thead><tr><th>Field</th><th>Tipe</th><th>Keterangan</th></tr></thead>
+              <tbody>
+                <tr><td><code>id</code></td><td>UUID</td><td>Identifier unik hasil AI.</td></tr>
+                <tr><td><code>jobId</code></td><td>UUID</td><td>Job PDF pemilik hasil.</td></tr>
+                <tr><td><code>originalName</code></td><td>string</td><td>Nama PDF sumber.</td></tr>
+                <tr><td><code>model</code></td><td>string</td><td>Model yang diminta client.</td></tr>
+                <tr><td><code>templateId</code></td><td>UUID | null</td><td>Template pertanyaan yang dipakai.</td></tr>
+                <tr><td><code>prompt</code></td><td>string</td><td>Pertanyaan atau instruksi pengguna.</td></tr>
+                <tr><td><code>content</code></td><td>string</td><td>Jawaban provider AI.</td></tr>
+                <tr><td><code>providerId</code></td><td>string | null</td><td>ID response dari provider.</td></tr>
+                <tr><td><code>providerModel</code></td><td>string</td><td>Nama model pada response provider.</td></tr>
+                <tr><td><code>usage</code></td><td>object | null</td><td>Informasi token jika disediakan provider.</td></tr>
+                <tr><td><code>createdAt</code></td><td>ISO 8601</td><td>Waktu hasil disimpan.</td></tr>
+                <tr><td><code>jobUrl</code></td><td>string</td><td>URL relatif metadata job sumber.</td></tr>
+                <tr><td><code>aiModelsUrl</code></td><td>string</td><td>URL relatif daftar model AI.</td></tr>
+                <tr><td><code>aiResultsUrl</code></td><td>string</td><td>URL relatif koleksi hasil AI job.</td></tr>
+                <tr><td><code>resultUrl</code></td><td>string</td><td>URL relatif hasil AI ini.</td></tr>
               </tbody>
             </table>
           </div>
@@ -426,7 +668,7 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
 
         <section class="docs-section" id="errors">
           <div class="docs-section-heading compact">
-            <span class="docs-step">04</span>
+            <span class="docs-step">05</span>
             <div>
               <p class="eyebrow">ERROR HANDLING</p>
               <h2>Status HTTP</h2>
@@ -441,7 +683,9 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
             <div><strong>413</strong><span><b>Payload Too Large</b> — PDF melebihi batas ukuran.</span></div>
             <div><strong>415</strong><span><b>Unsupported Media Type</b> — request bukan multipart/form-data.</span></div>
             <div><strong>500</strong><span><b>Internal Server Error</b> — ekstraksi atau proses internal gagal.</span></div>
+            <div><strong>502</strong><span><b>Bad Gateway</b> — provider AI menolak request atau memberi response tidak valid.</span></div>
             <div><strong>503</strong><span><b>Service Unavailable</b> — health check mendeteksi backend OCR belum siap.</span></div>
+            <div><strong>504</strong><span><b>Gateway Timeout</b> — provider AI tidak merespons sebelum timeout.</span></div>
           </div>
 
           <div class="code-sample docs-code-sample error-shape">

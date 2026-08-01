@@ -2,7 +2,7 @@ import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
 import { convert } from "@opendataloader/pdf";
 import Fastify from "fastify";
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import {
   mkdir,
   open,
@@ -17,6 +17,13 @@ import { generateSecret, generateURI, verifySync } from "otplib";
 import QRCode from "qrcode";
 
 import { ensureJava } from "./app.js";
+import {
+  AiError,
+  AiResultStore,
+  createAiCompletion,
+  fetchAiModels,
+  normalizeAiBaseUrl,
+} from "./ai.js";
 import { JobError, JobQueue } from "./job-queue.js";
 import {
   extractTextLayer,
@@ -63,6 +70,7 @@ export function loadConfig() {
     hybridTimeout: process.env.ODL_HYBRID_TIMEOUT ?? "0",
     authEnabled: true,
     sessionHours: numberFromEnv("APP_SESSION_HOURS", 12),
+    aiTimeoutMs: numberFromEnv("APP_AI_TIMEOUT_MS", 300_000),
     mfaIssuer: process.env.APP_TOTP_ISSUER?.trim() || "PDF2AI",
     mfaAccount: process.env.APP_TOTP_ACCOUNT?.trim() || "Dashboard",
     authFile: resolve(
@@ -176,6 +184,35 @@ async function loadMfaConfig(path) {
       typeof config.apiKey.createdAt !== "string")
   ) {
     throw new Error(`Konfigurasi API key tidak valid: ${path}`);
+  }
+  if (config.ai !== undefined) {
+    try {
+      normalizeAiBaseUrl(config.ai?.baseUrl);
+    } catch {
+      throw new Error(`Konfigurasi AI tidak valid: ${path}`);
+    }
+    if (
+      typeof config.ai !== "object" ||
+      typeof config.ai.token !== "string" ||
+      config.ai.token.length > 4096 ||
+      !Array.isArray(config.ai.models) ||
+      config.ai.models.some(
+        (model) => typeof model !== "string" || !model || model.length > 256,
+      ) ||
+      (config.ai.defaultModel !== undefined &&
+        (typeof config.ai.defaultModel !== "string" ||
+          !config.ai.models.includes(config.ai.defaultModel))) ||
+      !Array.isArray(config.ai.templates) ||
+      config.ai.templates.some(
+        (template) =>
+          typeof template?.id !== "string" ||
+          typeof template?.name !== "string" ||
+          typeof template?.prompt !== "string",
+      ) ||
+      typeof config.ai.updatedAt !== "string"
+    ) {
+      throw new Error(`Konfigurasi AI tidak valid: ${path}`);
+    }
   }
   return config;
 }
@@ -314,6 +351,19 @@ function serializeJob(job) {
       job.status === "completed"
         ? `/v1/jobs/${job.id}/markdown`
         : null,
+    aiModelsUrl: "/v1/ai/models",
+    aiResultsUrl: `/v1/jobs/${job.id}/ai`,
+  };
+}
+
+function serializeAiResult(result) {
+  const aiResultsUrl = `/v1/jobs/${result.jobId}/ai`;
+  return {
+    ...result,
+    jobUrl: `/v1/jobs/${result.jobId}`,
+    aiModelsUrl: "/v1/ai/models",
+    aiResultsUrl,
+    resultUrl: `${aiResultsUrl}/${result.id}`,
   };
 }
 
@@ -336,6 +386,8 @@ export async function buildServer({
   config = loadConfig(),
   extractor = extractMarkdown,
   hybridHealth = checkHybridHealth,
+  aiListModels = fetchAiModels,
+  aiComplete = createAiCompletion,
   dataDirectory =
     config.dataDirectory ??
     join(import.meta.dirname, "..", "data", "jobs"),
@@ -354,6 +406,13 @@ export async function buildServer({
   });
   await jobs.init();
   app.decorate("jobs", jobs);
+  const aiResults = new AiResultStore({
+    directory:
+      config.aiResultDirectory ?? join(dataDirectory, ".ai-results"),
+    logger: app.log,
+  });
+  await aiResults.init();
+  app.decorate("aiResults", aiResults);
 
   const authEnabled = config.authEnabled !== false;
   const authFile = config.authFile ?? join(dataDirectory, "auth.json");
@@ -365,7 +424,7 @@ export async function buildServer({
   const setupTokens = new Map();
   const failedLogins = new Map();
   const publicPaths = new Set([
-    "/health",
+    "/v1/health",
     "/login",
     "/login.js",
     "/setup",
@@ -409,7 +468,9 @@ export async function buildServer({
     }
 
     const pathname = request.raw.url.split("?", 1)[0];
-    const publicApi = pathname === "/v1" || pathname.startsWith("/v1/");
+    const publicApi =
+      pathname === "/v1" ||
+      pathname.startsWith("/v1/");
     if (publicPaths.has(pathname) || pathname.startsWith("/fonts/")) {
       return;
     }
@@ -672,6 +733,148 @@ export async function buildServer({
     return reply.code(204).send();
   });
 
+  function publicAiConfig() {
+    const ai = mfaConfig?.ai;
+    return {
+      configured: Boolean(ai?.baseUrl && ai.models.length > 0),
+      baseUrl: ai?.baseUrl ?? "",
+      hasToken: Boolean(ai?.token),
+      tokenHint: ai?.token
+        ? `${ai.token.slice(0, 3)}…${ai.token.slice(-4)}`
+        : null,
+      models: ai?.models ?? [],
+      defaultModel: ai?.models?.includes(ai.defaultModel)
+        ? ai.defaultModel
+        : ai?.models?.[0] ?? null,
+      templates: ai?.templates ?? [],
+      updatedAt: ai?.updatedAt ?? null,
+    };
+  }
+
+  function storedTokenFor(baseUrl, providedToken) {
+    if (providedToken !== undefined) {
+      return String(providedToken).trim();
+    }
+    return mfaConfig?.ai?.baseUrl === baseUrl
+      ? mfaConfig.ai.token
+      : "";
+  }
+
+  app.get("/auth/ai-config", async () => publicAiConfig());
+
+  app.post(
+    "/auth/ai-config/models",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["baseUrl"],
+          additionalProperties: false,
+          properties: {
+            baseUrl: { type: "string", minLength: 1, maxLength: 2048 },
+            token: { type: "string", maxLength: 4096 },
+          },
+        },
+      },
+    },
+    async (request) => {
+      const baseUrl = normalizeAiBaseUrl(request.body.baseUrl);
+      const token = storedTokenFor(baseUrl, request.body.token);
+      const models = await aiListModels({
+        baseUrl,
+        token,
+        timeoutMs: Math.min(config.aiTimeoutMs ?? 300_000, 30_000),
+      });
+      return { baseUrl, models };
+    },
+  );
+
+  app.put(
+    "/auth/ai-config",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["baseUrl", "models", "templates"],
+          additionalProperties: false,
+          properties: {
+            baseUrl: { type: "string", minLength: 1, maxLength: 2048 },
+            token: { type: "string", maxLength: 4096 },
+            models: {
+              type: "array",
+              minItems: 1,
+              maxItems: 500,
+              items: { type: "string", minLength: 1, maxLength: 256 },
+            },
+            defaultModel: { type: "string", minLength: 1, maxLength: 256 },
+            templates: {
+              type: "array",
+              maxItems: 50,
+              items: {
+                type: "object",
+                required: ["name", "prompt"],
+                additionalProperties: false,
+                properties: {
+                  id: { type: "string", maxLength: 64 },
+                  name: { type: "string", minLength: 1, maxLength: 100 },
+                  prompt: { type: "string", minLength: 1, maxLength: 20_000 },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    async (request) => {
+      if (!mfaConfig) {
+        throw new HttpError(409, "Selesaikan konfigurasi TOTP terlebih dahulu.");
+      }
+      const baseUrl = normalizeAiBaseUrl(request.body.baseUrl);
+      const models = [
+        ...new Set(request.body.models.map((model) => model.trim()).filter(Boolean)),
+      ];
+      if (models.length === 0) {
+        throw new HttpError(400, "Import setidaknya satu model AI.");
+      }
+      const defaultModel = request.body.defaultModel?.trim() || models[0];
+      if (!models.includes(defaultModel)) {
+        throw new HttpError(400, "Model default harus berasal dari hasil import.");
+      }
+      const templates = request.body.templates.map((template) => ({
+        id: template.id?.trim() || randomUUID(),
+        name: template.name.trim(),
+        prompt: template.prompt.trim(),
+      }));
+      if (templates.some((template) => !template.name || !template.prompt)) {
+        throw new HttpError(400, "Nama dan isi template tidak boleh kosong.");
+      }
+      const nextConfig = {
+        ...mfaConfig,
+        ai: {
+          baseUrl,
+          token: storedTokenFor(baseUrl, request.body.token),
+          models,
+          defaultModel,
+          templates,
+          updatedAt: new Date().toISOString(),
+        },
+      };
+      await saveMfaConfig(authFile, nextConfig);
+      mfaConfig = nextConfig;
+      return publicAiConfig();
+    },
+  );
+
+  app.delete("/auth/ai-config", async (_request, reply) => {
+    if (!mfaConfig?.ai) {
+      return reply.code(204).send();
+    }
+    const { ai: _removed, ...nextConfig } = mfaConfig;
+    await saveMfaConfig(authFile, nextConfig);
+    mfaConfig = nextConfig;
+    return reply.code(204).send();
+  });
+
   app.post("/logout", async (request, reply) => {
     const token = cookieSession(request);
     if (token) {
@@ -698,7 +901,7 @@ export async function buildServer({
     }),
   );
 
-  app.get("/health", async (_request, reply) => {
+  app.get("/v1/health", async (_request, reply) => {
     const hybridReady =
       config.hybrid === "off"
         ? true
@@ -710,6 +913,20 @@ export async function buildServer({
       hybridReady,
       queue: jobs.stats(),
     });
+  });
+
+  app.get("/v1/ai/models", async () => {
+    const ai = mfaConfig?.ai;
+    const models = ai?.models ?? [];
+    return {
+      configured: Boolean(ai?.baseUrl && models.length > 0),
+      modelsUrl: "/v1/ai/models",
+      models,
+      defaultModel: models.includes(ai?.defaultModel)
+        ? ai.defaultModel
+        : models[0] ?? null,
+      updatedAt: ai?.updatedAt ?? null,
+    };
   });
 
   async function receiveJob(request) {
@@ -781,8 +998,90 @@ export async function buildServer({
 
   app.delete("/v1/jobs/:id", async (request, reply) => {
     await jobs.delete(request.params.id);
+    await aiResults.deleteForJob(request.params.id);
     return reply.code(204).send();
   });
+
+  app.get("/v1/jobs/:jobId/ai", async (request) => {
+    jobs.get(request.params.jobId);
+    const aiResultsUrl = `/v1/jobs/${request.params.jobId}/ai`;
+    return {
+      jobUrl: `/v1/jobs/${request.params.jobId}`,
+      aiResultsUrl,
+      results: aiResults.list(request.params.jobId).map(serializeAiResult),
+    };
+  });
+
+  app.get("/v1/jobs/:jobId/ai/:aiId", async (request) => {
+    jobs.get(request.params.jobId);
+    const result = aiResults.get(request.params.aiId);
+    if (result.jobId !== request.params.jobId) {
+      throw new AiError(404, "Hasil AI tidak ditemukan.");
+    }
+    return { result: serializeAiResult(result) };
+  });
+
+  app.post(
+    "/v1/jobs/:jobId/ai",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["model", "message"],
+          additionalProperties: false,
+          properties: {
+            model: { type: "string", minLength: 1, maxLength: 256 },
+            message: { type: "string", minLength: 1, maxLength: 20_000 },
+            templateId: {
+              anyOf: [{ type: "string", maxLength: 64 }, { type: "null" }],
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const ai = mfaConfig?.ai;
+      if (!ai?.baseUrl || ai.models.length === 0) {
+        throw new HttpError(409, "Konfigurasi AI belum diselesaikan.");
+      }
+      const model = request.body.model.trim();
+      if (!ai.models.includes(model)) {
+        throw new HttpError(400, "Model belum diimport dalam konfigurasi AI.");
+      }
+      const prompt = request.body.message.trim();
+      if (!prompt) {
+        throw new HttpError(400, "Pesan untuk AI tidak boleh kosong.");
+      }
+      if (
+        request.body.templateId &&
+        !ai.templates.some((template) => template.id === request.body.templateId)
+      ) {
+        throw new HttpError(400, "Template AI tidak ditemukan.");
+      }
+
+      const job = jobs.get(request.params.jobId);
+      const markdown = await jobs.markdown(job.id);
+      const completion = await aiComplete({
+        baseUrl: ai.baseUrl,
+        token: ai.token,
+        model,
+        prompt,
+        markdown,
+        timeoutMs: config.aiTimeoutMs ?? 300_000,
+      });
+      jobs.get(job.id);
+      const result = await aiResults.save({
+        job,
+        model,
+        templateId: request.body.templateId ?? null,
+        prompt,
+        completion,
+      });
+      const serializedResult = serializeAiResult(result);
+      reply.header("Location", serializedResult.resultUrl);
+      return reply.code(201).send({ result: serializedResult });
+    },
+  );
 
   app.setErrorHandler((error, request, reply) => {
     if (error.code === "FST_REQ_FILE_TOO_LARGE") {
@@ -797,6 +1096,7 @@ export async function buildServer({
     }
     if (
       error instanceof HttpError ||
+      error instanceof AiError ||
       error instanceof JobError ||
       (error.statusCode && error.statusCode < 500)
     ) {

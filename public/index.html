@@ -22,12 +22,28 @@
           </span>
         </a>
 
-        <div class="topbar-actions">
+        <button
+          class="mobile-menu-button"
+          id="mobile-menu-button"
+          type="button"
+          aria-controls="topbar-actions"
+          aria-expanded="false"
+          aria-label="Buka menu navigasi"
+        >
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+        </button>
+
+        <div class="topbar-actions" id="topbar-actions">
           <div class="service-status" id="service-status" role="status">
             <span class="status-dot" aria-hidden="true"></span>
             <span id="service-status-text">Memeriksa mesin…</span>
           </div>
           <a class="logout-button" href="/docs">API Docs</a>
+          <button class="logout-button" id="ai-config-button" type="button">
+            Konfigurasi AI
+          </button>
           <button class="logout-button" id="api-key-button" type="button">
             API Key
           </button>
@@ -268,14 +284,14 @@
 
       <div class="fetch-dialog-body">
         <p class="api-intro">
-          Gunakan ID surat berikut untuk memeriksa status, mengambil PDF asli,
-          dan membaca hasil Markdown melalui API. Client eksternal harus
-          menyertakan header <code>X-API-Key</code>.
+          Gunakan ID dokumen berikut untuk memeriksa status, mengambil PDF asli,
+          membaca Markdown, dan mengakses hasil AI melalui API. Client eksternal
+          harus menyertakan header <code>X-API-Key</code>.
         </p>
 
         <section class="api-id-card" aria-labelledby="job-id-label">
           <div>
-            <span class="api-field-label" id="job-id-label">ID SURAT</span>
+            <span class="api-field-label" id="job-id-label">ID DOKUMEN</span>
             <code id="fetch-job-id"></code>
           </div>
           <button class="secondary-button" id="copy-job-id" type="button">
@@ -283,7 +299,7 @@
           </button>
         </section>
 
-        <section class="api-endpoints" aria-label="Endpoint surat">
+        <section class="api-endpoints" aria-label="Endpoint dokumen">
           <article>
             <div class="api-endpoint-heading">
               <span class="api-method">GET · METADATA</span>
@@ -326,6 +342,20 @@
             </div>
             <code id="fetch-markdown-url"></code>
           </article>
+          <article>
+            <div class="api-endpoint-heading">
+              <span class="api-method">GET · HASIL AI</span>
+              <button
+                class="endpoint-copy-button"
+                type="button"
+                data-copy-target="fetch-ai-results-url"
+                data-copy-label="Link hasil AI"
+              >
+                Copy Link
+              </button>
+            </div>
+            <code id="fetch-ai-results-url"></code>
+          </article>
           <article class="danger-endpoint">
             <div class="api-endpoint-heading">
               <span class="api-method">DELETE · HAPUS DATA</span>
@@ -344,19 +374,19 @@
 
         <section class="api-guide">
           <div>
-            <span class="step-label">CARA MENGAMBIL SURAT</span>
+            <span class="step-label">CARA MENGAMBIL DOKUMEN</span>
             <ol>
-              <li>Ambil metadata menggunakan ID surat.</li>
+              <li>Ambil metadata menggunakan ID dokumen.</li>
               <li>Pastikan statusnya sudah <code>completed</code>.</li>
-              <li>Fetch URL PDF dan Markdown dari metadata tersebut.</li>
+              <li>Ikuti URL PDF, Markdown, dan hasil AI dari metadata.</li>
               <li>
                 Kirim method <code>DELETE</code> ke URL metadata untuk
                 menghapusnya.
               </li>
             </ol>
             <p class="delete-api-note">
-              Penghapusan hanya berlaku untuk surat selesai atau gagal, dan
-              akan menghapus PDF serta Markdown secara permanen.
+              Penghapusan hanya berlaku untuk dokumen selesai atau gagal, dan
+              akan menghapus PDF, Markdown, serta seluruh hasil AI secara permanen.
             </p>
           </div>
 
@@ -431,6 +461,170 @@
         </button>
         <button class="primary-button" id="generate-api-key" type="button">
           Buat API key
+        </button>
+      </div>
+    </dialog>
+
+    <dialog class="ai-config-dialog" id="ai-config-dialog">
+      <div class="dialog-header">
+        <div>
+          <span class="step-label">OPENAI-COMPATIBLE</span>
+          <h2>Konfigurasi AI</h2>
+        </div>
+        <button
+          class="icon-button"
+          id="close-ai-config-dialog"
+          type="button"
+          aria-label="Tutup konfigurasi AI"
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
+
+      <div class="ai-config-body">
+        <section class="ai-config-status" id="ai-config-status">
+          <span class="api-field-label">STATUS</span>
+          <strong id="ai-config-status-text">Belum dikonfigurasi</strong>
+          <small id="ai-config-status-meta"></small>
+        </section>
+
+        <div class="ai-config-grid">
+          <label class="form-field ai-base-url-field">
+            <span>Base URL AI</span>
+            <input
+              id="ai-base-url"
+              type="url"
+              placeholder="https://api.openai.com/v1"
+              autocomplete="url"
+            />
+            <small>Sertakan prefix versi API, misalnya <code>/v1</code>.</small>
+          </label>
+
+          <label class="form-field">
+            <span>Token API</span>
+            <input
+              id="ai-token"
+              type="password"
+              placeholder="Kosongkan untuk mempertahankan token tersimpan"
+              autocomplete="new-password"
+            />
+            <small id="ai-token-hint">Token tidak pernah ditampilkan kembali.</small>
+          </label>
+        </div>
+
+        <div class="ai-import-row">
+          <div>
+            <strong>Model dari provider</strong>
+            <p>Periksa koneksi dan import daftar model dari endpoint <code>/models</code>.</p>
+          </div>
+          <button class="secondary-button" id="ai-import-models" type="button">
+            Cek &amp; import model
+          </button>
+        </div>
+
+        <div class="ai-model-list" id="ai-model-list" aria-live="polite">
+          <p>Belum ada model yang diimpor.</p>
+        </div>
+
+        <label class="form-field ai-default-model-field">
+          <span>Model default</span>
+          <select id="ai-default-model" disabled>
+            <option value="">Import model terlebih dahulu</option>
+          </select>
+          <small>Model ini otomatis dipilih pertama kali saat membuka Tanya AI.</small>
+        </label>
+
+        <section class="ai-template-section">
+          <div class="ai-template-heading">
+            <div>
+              <span class="step-label">PROMPT TERSIMPAN</span>
+              <h3>Template pertanyaan</h3>
+            </div>
+            <button class="secondary-button" id="add-ai-template" type="button">
+              + Template
+            </button>
+          </div>
+          <div class="ai-template-list" id="ai-template-list"></div>
+          <p class="ai-empty-copy" id="ai-template-empty">
+            Belum ada template. Anda tetap dapat menulis pertanyaan manual.
+          </p>
+        </section>
+
+        <p class="api-key-warning" id="ai-config-warning" hidden></p>
+      </div>
+
+      <div class="ai-dialog-actions">
+        <button class="secondary-button danger-button" id="delete-ai-config" type="button">
+          Hapus konfigurasi
+        </button>
+        <button class="primary-button" id="save-ai-config" type="button">
+          Simpan konfigurasi
+        </button>
+      </div>
+    </dialog>
+
+    <dialog class="ask-ai-dialog" id="ask-ai-dialog">
+      <div class="dialog-header">
+        <div>
+          <span class="step-label">TANYA DOKUMEN</span>
+          <h2 id="ask-ai-title">Tanya AI</h2>
+          <small class="ai-job-name" id="ask-ai-job-name"></small>
+        </div>
+        <button
+          class="icon-button"
+          id="close-ask-ai-dialog"
+          type="button"
+          aria-label="Tutup Tanya AI"
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
+
+      <div class="ask-ai-body">
+        <div class="ask-ai-controls">
+          <label class="form-field">
+            <span>Sumber pertanyaan</span>
+            <select id="ask-ai-template">
+              <option value="">Tulis manual</option>
+            </select>
+          </label>
+          <label class="form-field">
+            <span>Model</span>
+            <select id="ask-ai-model"></select>
+          </label>
+        </div>
+
+        <label class="form-field ask-ai-message-field">
+          <span>Pesan untuk AI</span>
+          <textarea
+            id="ask-ai-message"
+            rows="7"
+            maxlength="20000"
+            placeholder="Contoh: Ringkas dokumen ini dan tuliskan poin tindakan penting."
+          ></textarea>
+          <small>Isi Markdown hasil ekstraksi akan disertakan otomatis.</small>
+        </label>
+
+        <p class="api-key-warning" id="ask-ai-warning" hidden></p>
+
+        <section class="ai-result-section">
+          <div class="ai-result-heading">
+            <div>
+              <span class="step-label">HASIL TERSIMPAN</span>
+              <h3>Riwayat jawaban</h3>
+            </div>
+            <span class="ai-result-count" id="ai-result-count">0 hasil</span>
+          </div>
+          <div class="ai-result-list" id="ai-result-list">
+            <p class="ai-empty-copy">Belum ada jawaban AI untuk dokumen ini.</p>
+          </div>
+        </section>
+      </div>
+
+      <div class="ai-dialog-actions ask-ai-actions">
+        <small id="ask-ai-progress"></small>
+        <button class="primary-button" id="execute-ask-ai" type="button">
+          Eksekusi Tanya AI
         </button>
       </div>
     </dialog>

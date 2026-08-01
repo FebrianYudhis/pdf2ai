@@ -4,6 +4,10 @@ const button = document.querySelector("#login-button");
 const buttonLabel = document.querySelector("#login-button-label");
 const errorMessage = document.querySelector("#login-error");
 
+function totpDigits(value) {
+  return String(value).replace(/\D/g, "").slice(0, 6);
+}
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
   button.disabled = true;
@@ -15,7 +19,7 @@ form.addEventListener("submit", async (event) => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        code: code.value.replace(/\D/g, ""),
+        code: totpDigits(code.value),
       }),
     });
     if (!response.ok) {
@@ -34,5 +38,15 @@ form.addEventListener("submit", async (event) => {
 });
 
 code.addEventListener("input", () => {
-  code.value = code.value.replace(/\D/g, "").slice(0, 6);
+  code.value = totpDigits(code.value);
+});
+
+code.addEventListener("paste", (event) => {
+  const pastedCode = totpDigits(event.clipboardData?.getData("text") ?? "");
+  if (!pastedCode) {
+    return;
+  }
+  event.preventDefault();
+  code.value = pastedCode;
+  code.setSelectionRange(code.value.length, code.value.length);
 });

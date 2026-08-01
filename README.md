@@ -1,65 +1,88 @@
 # PDF2AI
 
-**PDF to AI Ready** — pipeline lokal untuk mengubah PDF digital maupun hasil
-scan menjadi Markdown terstruktur yang siap digunakan untuk RAG, pencarian,
-dan automasi AI.
+**PDF to AI Ready** — aplikasi mandiri untuk mengubah PDF digital maupun hasil
+scan menjadi Markdown, yaitu teks terstruktur yang mudah dibaca, disalin,
+dicari, dan digunakan oleh aplikasi AI.
 
-PDF2AI menyediakan dashboard web, antrean background persisten, OCR berbasis
-CPU, viewer PDF/metadata/Markdown, serta HTTP API untuk integrasi aplikasi lain.
-Parser dokumen menggunakan
-[OpenDataLoader PDF](https://opendataloader.org/).
+PDF diunggah melalui dashboard web dan diproses di komputer atau server tempat
+PDF2AI berjalan. Setelah selesai, Anda dapat membaca hasilnya, mengunduh PDF
+atau Markdown, dan—jika diinginkan—mengajukan pertanyaan kepada provider AI
+yang Anda konfigurasi sendiri.
+
+Ekstraksi PDF dan OCR berjalan secara lokal. Fitur **Tanya AI** bersifat
+opsional; ketika digunakan, isi Markdown dan pertanyaan Anda dikirim ke provider
+AI tersebut. Integrasi aplikasi lain melalui HTTP API juga tersedia, tetapi
+tidak diperlukan untuk penggunaan dashboard sehari-hari.
 
 ## Fitur utama
 
 - Upload satu atau beberapa PDF melalui drag-and-drop.
-- Pemrosesan background satu per satu agar stabil tanpa GPU.
-- Antrean dan data job tetap tersedia setelah aplikasi dimulai ulang.
+- Pemrosesan di latar belakang satu per satu agar stabil tanpa GPU.
+- Antrean dan data dokumen tetap tersedia setelah aplikasi dimulai ulang.
 - OCR scan melalui Docling, RapidOCR, dan ONNX Runtime.
 - Fallback text layer untuk PDF digital dengan hasil parser yang rusak.
 - Viewer terpadu untuk PDF asli, metadata, dan Markdown.
-- Copy link API untuk metadata, PDF, Markdown, dan penghapusan.
+- Salin link API untuk mengambil metadata, PDF, Markdown, dan hasil AI.
 - Unduh PDF atau Markdown langsung dari dashboard.
 - Hapus job beserta PDF, metadata, dan Markdown.
-- Job API asynchronous untuk integrasi aplikasi lain.
+- Konfirmasi SweetAlert sebelum penghapusan permanen atau pencabutan akses.
+- HTTP API berbasis antrean untuk integrasi aplikasi lain.
 - Dashboard responsif dengan tema terang dan gelap otomatis.
-- Login hanya dengan kode TOTP dari aplikasi authenticator standar.
+- Login dengan kode TOTP 6 digit dari aplikasi authenticator standar, tanpa
+  password tambahan.
 - API key yang dapat dibuat, dirotasi, dan dicabut oleh pengguna yang login.
+- Tanya AI untuk setiap PDF selesai melalui provider OpenAI-compatible.
+- Import model dari provider, template pertanyaan, dan riwayat jawaban persisten.
 
-## Quick Start
+## Mulai menggunakan PDF2AI
 
-### 1. Persyaratan
+PDF2AI saat ini dipasang dan dijalankan sendiri melalui terminal. Jika
+administrator sudah menyiapkan aplikasinya, Anda dapat langsung melanjutkan ke
+bagian [Menggunakan dashboard](#menggunakan-dashboard).
+
+### 1. Siapkan kebutuhan sistem
 
 | Runtime | Kebutuhan |
 | --- | --- |
 | Node.js | Versi 20.19 atau lebih baru |
 | Java/JDK | Versi 11 atau lebih baru; JDK 17 direkomendasikan |
 | Python | Python 3 untuk backend OCR |
+| Git | Opsional; diperlukan jika mengunduh aplikasi dengan `git clone` |
 | RAM | Sekitar 2–4 GB untuk OCR berbasis CPU |
 | Disk | Sekitar 1–2 GB untuk dependency dan model |
 
-Periksa runtime:
+Pastikan perintah berikut tersedia:
 
 ```bash
 node --version
 java -version
-python3 --version
+python --version
 ```
 
-Setup juga dapat menemukan executable `python`, `py -3`, atau nilai environment
-variable `PYTHON`.
+Jika perintah `python` tidak tersedia, setup juga dapat menemukan `python3`,
+`py -3`, atau executable yang ditentukan melalui environment variable `PYTHON`.
 
-### 2. Instal dependency
+### 2. Unduh kode aplikasi
+
+Unduh ZIP dari [repository PDF2AI](https://github.com/FebrianYudhis/pdf2ai),
+ekstrak, lalu buka terminal di folder tersebut. Pengguna Git dapat menjalankan:
+
+```bash
+git clone https://github.com/FebrianYudhis/pdf2ai.git
+cd pdf2ai
+```
+
+### 3. Instal komponen aplikasi
 
 ```bash
 npm install
 npm run setup:ocr
 ```
 
-`setup:ocr` membuat virtual environment `.venv`, memasang dependency dari
-`requirements-ocr.txt`, lalu menjalankan pemeriksaan dependency. Langkah ini
-hanya perlu dijalankan sekali atau ketika dependency OCR berubah.
+Perintah `setup:ocr` menyiapkan komponen yang diperlukan untuk membaca PDF hasil
+scan. Langkah ini biasanya hanya perlu dijalankan sekali.
 
-### 3. Jalankan aplikasi
+### 4. Jalankan aplikasi
 
 ```bash
 npm start
@@ -71,12 +94,12 @@ Buka:
 http://127.0.0.1:3000
 ```
 
-Launcher akan menyalakan backend OCR pada port `5002` jika diperlukan, menunggu
-hingga OCR siap, lalu menjalankan dashboard dan API pada port `3000`. Gunakan
-`Ctrl+C` untuk menghentikan seluruh proses yang dikelola launcher.
+Perintah tersebut menjalankan pemroses OCR, dashboard, dan API. Gunakan
+`Ctrl+C` di terminal untuk menghentikan aplikasi.
+
 Pada penggunaan pertama, browser akan membuka halaman konfigurasi TOTP:
 
-1. Tampilkan lalu pindai QR menggunakan aplikasi authenticator.
+1. Tampilkan lalu pindai kode QR menggunakan aplikasi authenticator.
 2. Masukkan kode 6 digit untuk mengaktifkan TOTP.
 
 Konfigurasi ini hanya dilakukan sekali. Login berikutnya selalu memerlukan
@@ -84,24 +107,26 @@ kode TOTP 6 digit tanpa password.
 
 ## Menggunakan dashboard
 
-1. Pilih atau tarik satu atau beberapa PDF ke area upload.
-2. Klik **Masukkan ke antrean**.
-3. Pantau status `Mengantre`, `Memproses`, `Selesai`, atau `Gagal`.
-4. Pada dokumen selesai, klik **Lihat hasil** untuk membuka:
+1. Masuk menggunakan kode TOTP 6 digit dari aplikasi authenticator.
+2. Pilih atau tarik satu atau beberapa PDF ke area upload, lalu klik
+   **Masukkan ke antrean**.
+3. Pantau status **Mengantre**, **Memproses**, **Selesai**, atau **Gagal**.
+4. Pada dokumen yang selesai, klik **Lihat hasil** untuk membuka:
    - PDF asli;
-   - metadata job;
+   - informasi pemrosesan; dan
    - hasil Markdown.
-5. Klik **API Key** untuk membuat atau merotasi key akses client eksternal.
-6. Buka **API Docs** untuk panduan endpoint, autentikasi, response, dan contoh
-   kode yang mengikuti alamat server aktif.
-7. Klik **Fetch Data** untuk melihat ID surat, URL API, contoh JavaScript, dan
-   cara menghapus data melalui API.
-8. Gunakan tombol **Hapus** untuk menghapus data secara permanen.
+5. Opsional: klik **Konfigurasi AI** untuk menghubungkan provider, memeriksa
+   token, mengimpor model, memilih model default, dan membuat template
+   pertanyaan. Tombol **Tanya AI** akan tersedia setelah konfigurasi valid.
+6. Opsional: klik **API Key** jika aplikasi lain perlu mengambil data PDF2AI.
+   Panduan lengkap tersedia melalui menu **API Docs**.
+7. Gunakan tombol **Hapus** hanya jika Anda ingin menghapus PDF dan seluruh
+   hasilnya secara permanen.
 
 Browser boleh ditutup setelah upload selesai. Job akan terus diproses oleh
 server dan dimuat kembali ketika aplikasi dimulai ulang.
 
-## Arsitektur
+## Cara kerja (gambaran teknis)
 
 ```text
 Browser / HTTP client
@@ -110,6 +135,7 @@ Browser / HTTP client
 Fastify API + antrean persisten (Node.js)
         |
         +----> PDF dan metadata di data/jobs/
+        +----> Hasil Tanya AI di data/jobs/.ai-results/
         |
         v
 OpenDataLoader PDF (Java)
@@ -119,12 +145,20 @@ Docling + RapidOCR (Python, mode hybrid)
         |
         v
 Markdown
+        |
+        v
+Provider AI OpenAI-compatible (opsional)
 ```
 
 Antrean menggunakan satu worker global. Pendekatan ini mencegah beberapa proses
 Java/OCR berat berjalan bersamaan pada perangkat berbasis CPU.
+Parser dokumen menggunakan
+[OpenDataLoader PDF](https://opendataloader.org/).
 
-## HTTP API
+## Integrasi HTTP API (opsional)
+
+Bagian ini ditujukan untuk developer atau pengguna yang ingin menghubungkan
+PDF2AI dengan aplikasi lain. Pengguna dashboard dapat melewatinya.
 
 Base URL default:
 
@@ -146,19 +180,23 @@ Client eksternal harus mengirim key melalui header:
 X-API-Key: <API_KEY>
 ```
 
-Endpoint `/health` tetap tersedia tanpa autentikasi untuk health check.
+Endpoint `/v1/health` tetap tersedia tanpa autentikasi untuk health check.
 
 ### Ringkasan endpoint
 
 | Method | Endpoint | Response |
 | --- | --- | --- |
-| `GET` | `/health` | Status API, OCR, dan statistik antrean |
+| `GET` | `/v1/health` | Status API, OCR, dan statistik antrean |
+| `GET` | `/v1/ai/models` | Daftar model AI tersimpan dan model default |
 | `POST` | `/v1/jobs` | Membuat job background |
 | `GET` | `/v1/jobs` | Daftar job dan statistik |
-| `GET` | `/v1/jobs/:id` | Metadata dan status job |
+| `GET` | `/v1/jobs/:id` | Metadata, status, dan URL resource job |
 | `GET` | `/v1/jobs/:id/pdf` | PDF asli |
 | `GET` | `/v1/jobs/:id/markdown` | Markdown hasil ekstraksi |
 | `DELETE` | `/v1/jobs/:id` | Menghapus job dan seluruh file |
+| `POST` | `/v1/jobs/:jobId/ai` | Menjalankan Tanya AI pada job selesai |
+| `GET` | `/v1/jobs/:jobId/ai` | Daftar hasil AI milik job |
+| `GET` | `/v1/jobs/:jobId/ai/:aiId` | Satu hasil AI berdasarkan ID |
 
 ### Upload PDF
 
@@ -190,7 +228,9 @@ Content-Type: application/json
     "completedAt": null,
     "jobUrl": "/v1/jobs/2a6cf34e-7c27-4ba8-afcc-8c91339e3f0c",
     "pdfUrl": "/v1/jobs/2a6cf34e-7c27-4ba8-afcc-8c91339e3f0c/pdf",
-    "markdownUrl": null
+    "markdownUrl": null,
+    "aiModelsUrl": "/v1/ai/models",
+    "aiResultsUrl": "/v1/jobs/2a6cf34e-7c27-4ba8-afcc-8c91339e3f0c/ai"
   }
 }
 ```
@@ -210,6 +250,11 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
 | `failed` | Ekstraksi gagal; lihat field `error` |
 
 `markdownUrl` bernilai `null` sampai job berstatus `completed`.
+`aiResultsUrl` selalu tersedia dan dapat dipakai untuk membuat pertanyaan baru
+atau mengambil daftar hasil AI. Dengan demikian client cukup mengikuti URL pada
+response dan tidak perlu menyusun path endpoint turunannya sendiri.
+`aiModelsUrl` mengarah ke daftar model AI yang dapat digunakan saat membuat
+pertanyaan.
 
 ### Ambil PDF
 
@@ -251,7 +296,117 @@ curl -X DELETE \
 ```
 
 Hanya job `completed` atau `failed` yang dapat dihapus. Penghapusan menghapus
-PDF sumber, metadata, dan Markdown secara permanen.
+PDF sumber, metadata, Markdown, dan seluruh hasil Tanya AI secara permanen.
+
+### Tanya AI
+
+Sebelum memakai endpoint AI, login TOTP lalu buka **Konfigurasi AI**:
+
+1. Isi Base URL OpenAI-compatible hingga prefix versinya, misalnya
+   `https://api.openai.com/v1`.
+2. Isi token provider. Token boleh kosong untuk provider lokal tanpa autentikasi.
+3. Klik **Cek & import model**. Server memanggil `GET <baseUrl>/models` dan
+   mengimport nilai `data[].id`.
+4. Pilih **Model default** yang otomatis muncul pertama saat membuka Tanya AI.
+5. Tambahkan template pertanyaan bila diperlukan, kemudian simpan.
+
+Konfigurasi lama yang belum memiliki model default otomatis memakai model
+pertama dari daftar impor. Pemanggilan melalui API tetap harus mengirim field
+`model` secara eksplisit.
+
+Periksa model yang dapat digunakan oleh client eksternal:
+
+```bash
+curl -H "X-API-Key: $PDF2AI_API_KEY" \
+  http://127.0.0.1:3000/v1/ai/models
+```
+
+```json
+{
+  "configured": true,
+  "modelsUrl": "/v1/ai/models",
+  "models": ["model-cepat", "model-teliti"],
+  "defaultModel": "model-teliti",
+  "updatedAt": "2026-08-01T09:00:00.000Z"
+}
+```
+
+Endpoint tersebut membaca konfigurasi tersimpan tanpa menghubungi provider
+ulang dan tidak mengembalikan Base URL atau token provider. Jika AI belum
+dikonfigurasi, response tetap `200 OK` dengan `configured: false` dan
+`models: []`.
+
+Kirim pertanyaan untuk PDF yang sudah berstatus `completed`:
+
+```bash
+curl -X POST http://127.0.0.1:3000/v1/jobs/JOB_ID/ai \
+  -H "X-API-Key: $PDF2AI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "MODEL_ID",
+    "message": "Ringkas dokumen dan tuliskan poin tindakan."
+  }'
+```
+
+Response `201 Created` berisi object `result`. Markdown dokumen disertakan oleh
+server secara otomatis dan tidak perlu dikirim oleh client. Header `Location`
+dan field `result.resultUrl` menunjuk ke hasil yang baru dibuat:
+
+```json
+{
+  "result": {
+    "id": "HASIL_AI_ID",
+    "jobId": "JOB_ID",
+    "model": "MODEL_ID",
+    "prompt": "Ringkas dokumen dan tuliskan poin tindakan.",
+    "content": "Jawaban dari AI...",
+    "jobUrl": "/v1/jobs/JOB_ID",
+    "aiModelsUrl": "/v1/ai/models",
+    "aiResultsUrl": "/v1/jobs/JOB_ID/ai",
+    "resultUrl": "/v1/jobs/JOB_ID/ai/HASIL_AI_ID"
+  }
+}
+```
+
+Ambil semua hasil untuk satu PDF:
+
+```bash
+curl -H "X-API-Key: $PDF2AI_API_KEY" \
+  "http://127.0.0.1:3000/v1/jobs/JOB_ID/ai"
+```
+
+Response daftar menghubungkan kembali koleksi ke job asal dan menyediakan URL
+setiap hasil:
+
+```json
+{
+  "jobUrl": "/v1/jobs/JOB_ID",
+  "aiModelsUrl": "/v1/ai/models",
+  "aiResultsUrl": "/v1/jobs/JOB_ID/ai",
+  "results": [
+    {
+      "id": "HASIL_AI_ID",
+      "jobId": "JOB_ID",
+      "aiModelsUrl": "/v1/ai/models",
+      "resultUrl": "/v1/jobs/JOB_ID/ai/HASIL_AI_ID"
+    }
+  ]
+}
+```
+
+Ambil satu hasil:
+
+```bash
+curl -H "X-API-Key: $PDF2AI_API_KEY" \
+  http://127.0.0.1:3000/v1/jobs/JOB_ID/ai/HASIL_AI_ID
+```
+
+Pada riwayat jawaban di dashboard, tombol **Salin link** memakai `resultUrl`
+dari API dan menyalinnya sebagai URL absolut. Client eksternal tetap perlu
+menyertakan header `X-API-Key` saat melakukan fetch.
+
+Endpoint AI menerima cookie sesi dashboard atau header `X-API-Key`, sama seperti
+endpoint terproteksi lain di bawah `/v1/*`.
 
 ### Contoh JavaScript lengkap
 
@@ -259,53 +414,72 @@ PDF sumber, metadata, dan Markdown secara permanen.
 const baseUrl = "http://127.0.0.1:3000";
 const auth = { "X-API-Key": process.env.PDF2AI_API_KEY };
 
-async function ambilSurat(id) {
+async function ambilModelAi() {
+  const response = await fetch(`${baseUrl}/v1/ai/models`, { headers: auth });
+  if (!response.ok) {
+    throw new Error(`Daftar model tidak dapat diambil (${response.status})`);
+  }
+  return response.json();
+}
+
+async function ambilDokumen(id) {
   const statusResponse = await fetch(`${baseUrl}/v1/jobs/${id}`, {
     headers: auth,
   });
   if (!statusResponse.ok) {
-    throw new Error(`Surat tidak ditemukan (${statusResponse.status})`);
+    throw new Error(`Dokumen tidak ditemukan (${statusResponse.status})`);
   }
 
   const { job } = await statusResponse.json();
   if (job.status !== "completed") {
-    throw new Error(`Surat belum selesai: ${job.status}`);
+    throw new Error(`Dokumen belum selesai: ${job.status}`);
   }
 
-  const [pdfResponse, markdownResponse] = await Promise.all([
+  const [pdfResponse, markdownResponse, aiResultsResponse] = await Promise.all([
     fetch(`${baseUrl}${job.pdfUrl}`, { headers: auth }),
     fetch(`${baseUrl}${job.markdownUrl}`, { headers: auth }),
+    fetch(`${baseUrl}${job.aiResultsUrl}`, { headers: auth }),
   ]);
 
-  if (!pdfResponse.ok || !markdownResponse.ok) {
-    throw new Error("Hasil surat tidak dapat diambil.");
+  if (!pdfResponse.ok || !markdownResponse.ok || !aiResultsResponse.ok) {
+    throw new Error("Data dokumen tidak dapat diambil.");
   }
 
-  const [pdf, markdown] = await Promise.all([
+  const [pdf, markdown, ai] = await Promise.all([
     pdfResponse.blob(),
     markdownResponse.text(),
+    aiResultsResponse.json(),
   ]);
 
-  return { metadata: job, pdf, markdown };
+  return { metadata: job, pdf, markdown, aiResults: ai.results };
 }
 
-async function hapusSurat(id) {
-  const response = await fetch(`${baseUrl}/v1/jobs/${id}`, {
+async function hapusDokumen(jobUrl) {
+  const response = await fetch(`${baseUrl}${jobUrl}`, {
     method: "DELETE",
     headers: auth,
   });
 
   if (!response.ok) {
-    throw new Error(`Surat gagal dihapus (${response.status})`);
+    throw new Error(`Dokumen gagal dihapus (${response.status})`);
   }
 }
+
+const [konfigurasiModel, dokumen] = await Promise.all([
+  ambilModelAi(),
+  ambilDokumen("JOB_ID"),
+]);
+console.log(konfigurasiModel.defaultModel, dokumen.markdown, dokumen.aiResults);
+
+// Jalankan hanya ketika data memang ingin dihapus:
+// await hapusDokumen(dokumen.metadata.jobUrl);
 ```
 
 Untuk JavaScript yang berjalan pada origin berbeda, browser memerlukan
 konfigurasi CORS. Client backend-to-backend tidak terpengaruh aturan CORS
 browser.
 
-## Konfigurasi
+## Konfigurasi lanjutan (opsional)
 
 | Variable | Default | Keterangan |
 | --- | --- | --- |
@@ -313,6 +487,7 @@ browser.
 | `APP_AUTH_FILE` | `data/auth.json` | Lokasi konfigurasi rahasia TOTP |
 | `APP_TOTP_ISSUER` | `PDF2AI` | Nama aplikasi di authenticator |
 | `APP_TOTP_ACCOUNT` | `Dashboard` | Nama akun di authenticator |
+| `APP_AI_TIMEOUT_MS` | `300000` | Timeout request jawaban AI dalam milidetik |
 | `HOST` | `127.0.0.1` | Host dashboard dan API |
 | `PORT` | `3000` | Port dashboard dan API |
 | `ODL_DATA_DIR` | `data/jobs` | Direktori penyimpanan job |
@@ -354,7 +529,7 @@ ODL_HYBRID_MODE=full ODL_FORCE_OCR=true npm start
 
 Mode penuh lebih lambat pada CPU.
 
-## NPM scripts
+## Perintah administrator dan developer
 
 | Command | Keterangan |
 | --- | --- |
@@ -364,7 +539,7 @@ Mode penuh lebih lambat pada CPU.
 | `npm run cli -- <args>` | Menjalankan CLI OpenDataLoader |
 | `npm test` | Menjalankan seluruh automated test |
 
-## Penyimpanan data
+## Lokasi penyimpanan data
 
 Setiap job disimpan di:
 
@@ -373,12 +548,15 @@ data/jobs/<job-id>/
 ├── input.pdf
 ├── metadata.json
 └── result.md
+
+data/jobs/.ai-results/
+└── <hasil-ai-id>.json
 ```
 
 `result.md` tersedia setelah job selesai. Job yang berstatus `processing` ketika
 server berhenti akan dikembalikan menjadi `queued` saat startup berikutnya.
 
-## Struktur proyek
+## Struktur proyek (referensi developer)
 
 ```text
 .
@@ -394,6 +572,7 @@ server berhenti akan dikembalikan menjadi `queued` saat startup berikutnya.
 │   └── setup-ocr.js
 ├── src/
 │   ├── app.js
+│   ├── ai.js
 │   ├── job-queue.js
 │   ├── pdf-text-fallback.js
 │   ├── server.js
@@ -448,19 +627,27 @@ curl http://127.0.0.1:5002/health
   kali per alamat IP dalam lima menit.
 - Endpoint `/v1/*` memerlukan header `X-API-Key`. Dashboard yang sudah login
   tetap dapat memakai endpoint tersebut melalui cookie sesi.
+- Endpoint `/v1/jobs/:jobId/ai*` memerlukan API key atau cookie sesi dashboard.
 - API key dibuat dari bilangan acak kriptografis dan hanya hash SHA-256-nya
   yang disimpan. Key lengkap hanya ditampilkan saat dibuat atau dirotasi.
 - Secret TOTP disimpan lokal di `data/auth.json` dengan mode `0600` pada sistem
   yang mendukung permission POSIX. Jangan membagikan file ini atau key manual
   yang ditampilkan saat setup.
+- Token provider AI perlu tersedia dalam bentuk asli untuk request keluar dan
+  disimpan lokal di `data/auth.json`. Endpoint konfigurasi hanya mengembalikan
+  status serta potongan token, tidak pernah token lengkap.
 - Cookie sesi menggunakan `HttpOnly` dan `SameSite=Strict`; atribut `Secure`
   aktif ketika aplikasi diakses melalui HTTPS.
 - Setup pertama tidak memiliki password pelindung. Selesaikan enrollment saat
   aplikasi masih hanya dapat diakses dari `127.0.0.1`, lalu gunakan HTTPS
   sebelum membuka service ke jaringan atau production.
 - Dokumen sensitif sebaiknya diproses pada lingkungan yang tepercaya.
+- Ekstraksi PDF berlangsung lokal, tetapi fitur **Tanya AI** mengirim hasil
+  Markdown dan pertanyaan ke provider AI yang dikonfigurasi. Periksa kebijakan
+  privasi provider sebelum mengirim dokumen sensitif.
 - Font antarmuka disimpan di `public/fonts/`; browser tidak perlu mengambil font
   dari CDN eksternal.
+- SweetAlert2 disajikan dari aset lokal di `public/vendor/` tanpa request ke CDN.
 
 Jika perangkat authenticator hilang, hentikan aplikasi, hapus
 `data/auth.json`, lalu jalankan aplikasi kembali untuk melakukan enrollment

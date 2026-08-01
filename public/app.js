@@ -1,6 +1,11 @@
+import Swal from "/vendor/sweetalert2.esm.all.min.js";
+
 const elements = {
+  mobileMenuButton: document.querySelector("#mobile-menu-button"),
+  topbarActions: document.querySelector("#topbar-actions"),
   serviceStatus: document.querySelector("#service-status"),
   serviceStatusText: document.querySelector("#service-status-text"),
+  aiConfigButton: document.querySelector("#ai-config-button"),
   apiKeyButton: document.querySelector("#api-key-button"),
   logoutButton: document.querySelector("#logout-button"),
   counts: {
@@ -40,6 +45,7 @@ const elements = {
   fetchMetadataUrl: document.querySelector("#fetch-metadata-url"),
   fetchPdfUrl: document.querySelector("#fetch-pdf-url"),
   fetchMarkdownUrl: document.querySelector("#fetch-markdown-url"),
+  fetchAiResultsUrl: document.querySelector("#fetch-ai-results-url"),
   fetchDeleteUrl: document.querySelector("#fetch-delete-url"),
   fetchCode: document.querySelector("#fetch-code"),
   copyFetchCode: document.querySelector("#copy-fetch-code"),
@@ -55,8 +61,78 @@ const elements = {
   copyApiKey: document.querySelector("#copy-api-key"),
   generateApiKey: document.querySelector("#generate-api-key"),
   revokeApiKey: document.querySelector("#revoke-api-key"),
+  aiConfigDialog: document.querySelector("#ai-config-dialog"),
+  closeAiConfigDialog: document.querySelector("#close-ai-config-dialog"),
+  aiConfigStatusText: document.querySelector("#ai-config-status-text"),
+  aiConfigStatusMeta: document.querySelector("#ai-config-status-meta"),
+  aiBaseUrl: document.querySelector("#ai-base-url"),
+  aiToken: document.querySelector("#ai-token"),
+  aiTokenHint: document.querySelector("#ai-token-hint"),
+  aiImportModels: document.querySelector("#ai-import-models"),
+  aiModelList: document.querySelector("#ai-model-list"),
+  aiDefaultModel: document.querySelector("#ai-default-model"),
+  aiTemplateList: document.querySelector("#ai-template-list"),
+  aiTemplateEmpty: document.querySelector("#ai-template-empty"),
+  addAiTemplate: document.querySelector("#add-ai-template"),
+  aiConfigWarning: document.querySelector("#ai-config-warning"),
+  deleteAiConfig: document.querySelector("#delete-ai-config"),
+  saveAiConfig: document.querySelector("#save-ai-config"),
+  askAiDialog: document.querySelector("#ask-ai-dialog"),
+  closeAskAiDialog: document.querySelector("#close-ask-ai-dialog"),
+  askAiTitle: document.querySelector("#ask-ai-title"),
+  askAiJobName: document.querySelector("#ask-ai-job-name"),
+  askAiTemplate: document.querySelector("#ask-ai-template"),
+  askAiModel: document.querySelector("#ask-ai-model"),
+  askAiMessage: document.querySelector("#ask-ai-message"),
+  askAiWarning: document.querySelector("#ask-ai-warning"),
+  aiResultCount: document.querySelector("#ai-result-count"),
+  aiResultList: document.querySelector("#ai-result-list"),
+  askAiProgress: document.querySelector("#ask-ai-progress"),
+  executeAskAi: document.querySelector("#execute-ask-ai"),
   toastRegion: document.querySelector("#toast-region"),
 };
+
+function setMobileMenuOpen(open) {
+  elements.topbarActions?.classList.toggle("is-open", open);
+  elements.mobileMenuButton?.classList.toggle("is-open", open);
+  elements.mobileMenuButton?.setAttribute("aria-expanded", String(open));
+  elements.mobileMenuButton?.setAttribute(
+    "aria-label",
+    open ? "Tutup menu navigasi" : "Buka menu navigasi",
+  );
+}
+
+elements.mobileMenuButton?.addEventListener("click", () => {
+  const isOpen = elements.mobileMenuButton.getAttribute("aria-expanded") === "true";
+  setMobileMenuOpen(!isOpen);
+});
+
+elements.topbarActions?.addEventListener("click", (event) => {
+  if (event.target.closest("a, button")) {
+    setMobileMenuOpen(false);
+  }
+});
+
+document.addEventListener("click", (event) => {
+  if (
+    elements.mobileMenuButton?.getAttribute("aria-expanded") === "true" &&
+    !event.target.closest(".topbar-inner")
+  ) {
+    setMobileMenuOpen(false);
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    setMobileMenuOpen(false);
+  }
+});
+
+window.addEventListener("resize", () => {
+  if (window.innerWidth > 600) {
+    setMobileMenuOpen(false);
+  }
+});
 
 const statusLabels = {
   queued: "Mengantre",
@@ -71,6 +147,20 @@ let currentFetchExample = "";
 let uploading = false;
 let refreshTimer;
 let apiKeyConfigured = false;
+let latestJobs = [];
+let importedAiModels = [];
+let importedAiBaseUrl = "";
+let currentAiJob = null;
+let aiConfig = {
+  configured: false,
+  baseUrl: "",
+  hasToken: false,
+  tokenHint: null,
+  models: [],
+  defaultModel: null,
+  templates: [],
+  updatedAt: null,
+};
 
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes < 1) {
@@ -201,6 +291,7 @@ function actionButton(label, className, handler, title = label) {
 }
 
 function renderJobs(jobs) {
+  latestJobs = jobs;
   if (jobs.length === 0) {
     elements.jobList.replaceChildren(elements.emptyState);
     return;
@@ -256,6 +347,16 @@ function renderJobs(jobs) {
     const actions = document.createElement("div");
     actions.className = "job-actions";
     if (job.status === "completed") {
+      if (aiConfig.configured) {
+        actions.append(
+          actionButton(
+            "Tanya AI",
+            "small-action ai",
+            () => openAskAi(job),
+            "Ajukan pertanyaan tentang dokumen kepada AI",
+          ),
+        );
+      }
       actions.append(
         actionButton(
           "Fetch Data",
@@ -323,7 +424,7 @@ async function refreshJobs({ quiet = false } = {}) {
 
 async function checkHealth() {
   try {
-    const response = await fetch("/health");
+    const response = await fetch("/v1/health");
     const body = await response.json();
     elements.serviceStatus.classList.toggle("ready", response.ok);
     elements.serviceStatus.classList.toggle("error", !response.ok);
@@ -337,6 +438,28 @@ async function checkHealth() {
     elements.serviceStatus.classList.add("error");
     elements.serviceStatusText.textContent = "Service tidak terhubung";
   }
+}
+
+async function confirmDeletion({ title, text, confirmButtonText = "Hapus" }) {
+  const target = document.querySelector("dialog[open]") ?? document.body;
+  const result = await Swal.fire({
+    target,
+    title,
+    text,
+    icon: "warning",
+    showCancelButton: true,
+    reverseButtons: true,
+    focusCancel: true,
+    confirmButtonText,
+    cancelButtonText: "Batal",
+    confirmButtonColor: "#ef4444",
+    cancelButtonColor: "#64748b",
+    customClass: {
+      popup: "pdf2ai-swal-popup",
+      title: "pdf2ai-swal-title",
+    },
+  });
+  return result.isConfirmed;
 }
 
 function renderApiKeyStatus(status) {
@@ -399,7 +522,13 @@ async function generateApiKey() {
 }
 
 async function revokeApiKey() {
-  if (!window.confirm("Cabut API key aktif? Client eksternal akan kehilangan akses.")) {
+  if (
+    !(await confirmDeletion({
+      title: "Cabut API key?",
+      text: "Client eksternal akan langsung kehilangan akses ke seluruh endpoint terproteksi.",
+      confirmButtonText: "Cabut API key",
+    }))
+  ) {
     return;
   }
   elements.revokeApiKey.disabled = true;
@@ -411,6 +540,413 @@ async function revokeApiKey() {
   } catch (error) {
     showToast(error.message, "error");
     elements.revokeApiKey.disabled = false;
+  }
+}
+
+function renderAiConfigStatus() {
+  elements.aiConfigStatusText.textContent = aiConfig.configured
+    ? "AI siap digunakan"
+    : "Belum dikonfigurasi";
+  const details = [];
+  if (aiConfig.models.length > 0) {
+    details.push(`${aiConfig.models.length} model`);
+  }
+  if (aiConfig.defaultModel) {
+    details.push(`default ${aiConfig.defaultModel}`);
+  }
+  if (aiConfig.hasToken) {
+    details.push(`token ${aiConfig.tokenHint}`);
+  }
+  if (aiConfig.updatedAt) {
+    details.push(`diperbarui ${formatTime(aiConfig.updatedAt)}`);
+  }
+  elements.aiConfigStatusMeta.textContent = details.join(" · ") ||
+    "Hubungkan provider OpenAI-compatible untuk mengaktifkan Tanya AI.";
+  elements.deleteAiConfig.disabled = !aiConfig.configured;
+  elements.aiTokenHint.textContent = aiConfig.hasToken
+    ? `Token tersimpan: ${aiConfig.tokenHint}. Kosongkan untuk mempertahankannya.`
+    : "Token opsional untuk provider lokal dan tidak pernah ditampilkan kembali.";
+}
+
+async function refreshAiConfig() {
+  try {
+    const response = await api("/auth/ai-config");
+    aiConfig = await response.json();
+    importedAiModels = [...aiConfig.models];
+    importedAiBaseUrl = aiConfig.baseUrl;
+    renderAiConfigStatus();
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+}
+
+function renderImportedModels() {
+  const preferredDefault = elements.aiDefaultModel.value || aiConfig.defaultModel;
+  if (importedAiModels.length === 0) {
+    const empty = document.createElement("p");
+    empty.textContent = "Belum ada model yang diimpor.";
+    elements.aiModelList.replaceChildren(empty);
+    elements.aiDefaultModel.replaceChildren(
+      new Option("Import model terlebih dahulu", ""),
+    );
+    elements.aiDefaultModel.disabled = true;
+    return;
+  }
+  elements.aiModelList.replaceChildren(
+    ...importedAiModels.map((model) => {
+      const item = document.createElement("code");
+      item.textContent = model;
+      return item;
+    }),
+  );
+  elements.aiDefaultModel.replaceChildren(
+    ...importedAiModels.map((model) => new Option(model, model)),
+  );
+  elements.aiDefaultModel.value = importedAiModels.includes(preferredDefault)
+    ? preferredDefault
+    : importedAiModels[0];
+  elements.aiDefaultModel.disabled = false;
+}
+
+function createTemplateEditor(template = {}) {
+  const editor = document.createElement("article");
+  editor.className = "ai-template-editor";
+  editor.dataset.templateId = template.id || crypto.randomUUID();
+
+  const nameField = document.createElement("label");
+  nameField.className = "form-field";
+  const nameLabel = document.createElement("span");
+  nameLabel.textContent = "Nama template";
+  const name = document.createElement("input");
+  name.type = "text";
+  name.maxLength = 100;
+  name.placeholder = "Contoh: Ringkasan eksekutif";
+  name.value = template.name || "";
+  name.dataset.templateName = "";
+  nameField.append(nameLabel, name);
+
+  const promptField = document.createElement("label");
+  promptField.className = "form-field ai-template-prompt";
+  const promptLabel = document.createElement("span");
+  promptLabel.textContent = "Isi pertanyaan";
+  const prompt = document.createElement("textarea");
+  prompt.rows = 4;
+  prompt.maxLength = 20_000;
+  prompt.placeholder = "Tuliskan instruksi yang dapat dipakai berulang kali…";
+  prompt.value = template.prompt || "";
+  prompt.dataset.templatePrompt = "";
+  promptField.append(promptLabel, prompt);
+
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "text-button danger-text-button";
+  remove.textContent = "Hapus template";
+  remove.addEventListener("click", () => {
+    editor.remove();
+    elements.aiTemplateEmpty.hidden = elements.aiTemplateList.children.length > 0;
+  });
+
+  editor.append(nameField, promptField, remove);
+  return editor;
+}
+
+function renderTemplateEditors(templates) {
+  elements.aiTemplateList.replaceChildren(
+    ...templates.map((template) => createTemplateEditor(template)),
+  );
+  elements.aiTemplateEmpty.hidden = templates.length > 0;
+}
+
+function collectTemplates() {
+  return [...elements.aiTemplateList.children].map((editor) => ({
+    id: editor.dataset.templateId,
+    name: editor.querySelector("[data-template-name]").value.trim(),
+    prompt: editor.querySelector("[data-template-prompt]").value.trim(),
+  }));
+}
+
+async function openAiConfigDialog() {
+  elements.aiConfigWarning.hidden = true;
+  elements.aiToken.value = "";
+  elements.aiConfigDialog.showModal();
+  await refreshAiConfig();
+  elements.aiBaseUrl.value = aiConfig.baseUrl;
+  renderImportedModels();
+  renderTemplateEditors(aiConfig.templates);
+}
+
+function closeAiConfigDialog() {
+  elements.aiToken.value = "";
+  elements.aiConfigDialog.close();
+}
+
+async function importAiModels() {
+  const baseUrl = elements.aiBaseUrl.value.trim();
+  if (!baseUrl) {
+    elements.aiBaseUrl.focus();
+    showToast("Isi Base URL AI terlebih dahulu.", "error");
+    return;
+  }
+  const payload = { baseUrl };
+  if (elements.aiToken.value) {
+    payload.token = elements.aiToken.value;
+  }
+  elements.aiImportModels.disabled = true;
+  elements.aiImportModels.textContent = "Memeriksa…";
+  elements.aiConfigWarning.hidden = true;
+  try {
+    const response = await api("/auth/ai-config/models", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json();
+    elements.aiBaseUrl.value = result.baseUrl;
+    importedAiModels = result.models;
+    importedAiBaseUrl = result.baseUrl;
+    renderImportedModels();
+    showToast(`${result.models.length} model berhasil diimpor.`);
+  } catch (error) {
+    elements.aiConfigWarning.textContent = error.message;
+    elements.aiConfigWarning.hidden = false;
+  } finally {
+    elements.aiImportModels.disabled = false;
+    elements.aiImportModels.textContent = "Cek & import model";
+  }
+}
+
+async function saveAiConfiguration() {
+  const templates = collectTemplates();
+  if (templates.some((template) => !template.name || !template.prompt)) {
+    showToast("Lengkapi nama dan isi semua template.", "error");
+    return;
+  }
+  if (importedAiModels.length === 0) {
+    showToast("Cek koneksi dan import model terlebih dahulu.", "error");
+    return;
+  }
+  if (elements.aiBaseUrl.value.trim().replace(/\/+$/, "") !== importedAiBaseUrl) {
+    showToast("Base URL berubah. Cek dan import model kembali.", "error");
+    return;
+  }
+  const payload = {
+    baseUrl: elements.aiBaseUrl.value.trim(),
+    models: importedAiModels,
+    defaultModel: elements.aiDefaultModel.value,
+    templates,
+  };
+  if (elements.aiToken.value) {
+    payload.token = elements.aiToken.value;
+  }
+
+  elements.saveAiConfig.disabled = true;
+  elements.aiConfigWarning.hidden = true;
+  try {
+    const response = await api("/auth/ai-config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    aiConfig = await response.json();
+    importedAiModels = [...aiConfig.models];
+    importedAiBaseUrl = aiConfig.baseUrl;
+    renderAiConfigStatus();
+    renderJobs(latestJobs);
+    closeAiConfigDialog();
+    showToast("Konfigurasi AI berhasil disimpan.");
+  } catch (error) {
+    elements.aiConfigWarning.textContent = error.message;
+    elements.aiConfigWarning.hidden = false;
+  } finally {
+    elements.saveAiConfig.disabled = false;
+  }
+}
+
+async function deleteAiConfiguration() {
+  if (
+    !(await confirmDeletion({
+      title: "Hapus konfigurasi AI?",
+      text: "Base URL, token, model, dan template akan dihapus. Hasil Tanya AI yang sudah tersimpan tetap tersedia.",
+      confirmButtonText: "Hapus konfigurasi",
+    }))
+  ) {
+    return;
+  }
+  try {
+    await api("/auth/ai-config", { method: "DELETE" });
+    aiConfig = {
+      configured: false,
+      baseUrl: "",
+      hasToken: false,
+      tokenHint: null,
+      models: [],
+      defaultModel: null,
+      templates: [],
+      updatedAt: null,
+    };
+    importedAiModels = [];
+    importedAiBaseUrl = "";
+    renderJobs(latestJobs);
+    closeAiConfigDialog();
+    showToast("Konfigurasi AI telah dihapus.");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+}
+
+function renderAiResults(results) {
+  elements.aiResultCount.textContent = `${results.length} hasil`;
+  if (results.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "ai-empty-copy";
+    empty.textContent = "Belum ada jawaban AI untuk dokumen ini.";
+    elements.aiResultList.replaceChildren(empty);
+    return;
+  }
+
+  elements.aiResultList.replaceChildren(
+    ...results.map((result) => {
+      const card = document.createElement("article");
+      card.className = "ai-result-card";
+
+      const header = document.createElement("div");
+      header.className = "ai-result-card-header";
+      const meta = document.createElement("div");
+      const model = document.createElement("code");
+      model.textContent = result.providerModel || result.model;
+      const time = document.createElement("small");
+      time.textContent = formatTime(result.createdAt);
+      meta.append(model, time);
+
+      const actions = document.createElement("div");
+      actions.className = "ai-result-card-actions";
+      const resultUrl = new URL(
+        result.resultUrl ??
+          `/v1/jobs/${encodeURIComponent(result.jobId)}/ai/${encodeURIComponent(result.id)}`,
+        window.location.origin,
+      ).href;
+      const copyLink = document.createElement("button");
+      copyLink.type = "button";
+      copyLink.className = "endpoint-copy-button";
+      copyLink.textContent = "Salin link";
+      copyLink.title = "Salin endpoint GET untuk hasil AI ini";
+      copyLink.dataset.fetchUrl = resultUrl;
+      copyLink.addEventListener("click", () =>
+        copyText(
+          resultUrl,
+          "Link fetch hasil AI disalin.",
+        ),
+      );
+      const copyAnswer = document.createElement("button");
+      copyAnswer.type = "button";
+      copyAnswer.className = "endpoint-copy-button";
+      copyAnswer.textContent = "Salin jawaban";
+      copyAnswer.addEventListener("click", () =>
+        copyText(result.content, "Jawaban AI disalin."),
+      );
+      actions.append(copyLink, copyAnswer);
+      header.append(meta, actions);
+
+      const prompt = document.createElement("details");
+      prompt.className = "ai-result-prompt";
+      const summary = document.createElement("summary");
+      summary.textContent = "Lihat pertanyaan";
+      const promptCopy = document.createElement("p");
+      promptCopy.textContent = result.prompt;
+      prompt.append(summary, promptCopy);
+
+      const content = document.createElement("pre");
+      content.textContent = result.content;
+      card.append(header, prompt, content);
+      return card;
+    }),
+  );
+}
+
+async function loadAiResults(jobId) {
+  try {
+    const response = await api(`/v1/jobs/${encodeURIComponent(jobId)}/ai`);
+    const body = await response.json();
+    renderAiResults(body.results);
+  } catch (error) {
+    elements.askAiWarning.textContent = error.message;
+    elements.askAiWarning.hidden = false;
+  }
+}
+
+async function openAskAi(job) {
+  currentAiJob = job;
+  elements.askAiTitle.textContent = "Tanya AI";
+  elements.askAiJobName.textContent = job.originalName;
+  elements.askAiMessage.value = "";
+  elements.askAiWarning.hidden = true;
+  elements.askAiProgress.textContent = "";
+  elements.askAiTemplate.replaceChildren(
+    new Option("Tulis manual", ""),
+    ...aiConfig.templates.map(
+      (template) => new Option(template.name, template.id),
+    ),
+  );
+  const orderedModels = aiConfig.defaultModel
+    ? [
+        aiConfig.defaultModel,
+        ...aiConfig.models.filter((model) => model !== aiConfig.defaultModel),
+      ]
+    : aiConfig.models;
+  elements.askAiModel.replaceChildren(
+    ...orderedModels.map(
+      (model) => new Option(
+        model === aiConfig.defaultModel ? `${model} (default)` : model,
+        model,
+      ),
+    ),
+  );
+  elements.askAiDialog.showModal();
+  await loadAiResults(job.id);
+}
+
+function closeAskAiDialog() {
+  currentAiJob = null;
+  elements.askAiDialog.close();
+}
+
+async function executeAskAi() {
+  if (!currentAiJob) {
+    return;
+  }
+  const message = elements.askAiMessage.value.trim();
+  if (!message) {
+    elements.askAiMessage.focus();
+    showToast("Tuliskan pesan untuk AI.", "error");
+    return;
+  }
+
+  elements.executeAskAi.disabled = true;
+  elements.askAiWarning.hidden = true;
+  elements.askAiProgress.textContent = "AI sedang membaca Markdown dan menyusun jawaban…";
+  try {
+    const response = await api(
+      `/v1/jobs/${encodeURIComponent(currentAiJob.id)}/ai`,
+      {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: elements.askAiModel.value,
+        message,
+        templateId: elements.askAiTemplate.value || null,
+      }),
+      },
+    );
+    await response.json();
+    await loadAiResults(currentAiJob.id);
+    elements.askAiProgress.textContent = "Jawaban berhasil disimpan.";
+    showToast("AI selesai menjawab dokumen.");
+  } catch (error) {
+    elements.askAiWarning.textContent = error.message;
+    elements.askAiWarning.hidden = false;
+    elements.askAiProgress.textContent = "";
+  } finally {
+    elements.executeAskAi.disabled = false;
   }
 }
 
@@ -453,12 +989,15 @@ async function openResult(job) {
   const markdownUrl =
     job.markdownUrl ?? `/v1/jobs/${job.id}/markdown`;
   const jobUrl = job.jobUrl ?? `/v1/jobs/${job.id}`;
+  const aiResultsUrl =
+    job.aiResultsUrl ?? `/v1/jobs/${job.id}/ai`;
   const absoluteUrl = (path) => new URL(path, window.location.origin).href;
   const metadata = {
     ...job,
     jobUrl: absoluteUrl(jobUrl),
     pdfUrl: absoluteUrl(pdfUrl),
     markdownUrl: absoluteUrl(markdownUrl),
+    aiResultsUrl: absoluteUrl(aiResultsUrl),
   };
 
   elements.dialogTitle.textContent = job.originalName;
@@ -509,53 +1048,55 @@ function createFetchExample(job) {
 const apiKey = "GANTI_DENGAN_API_KEY";
 const headers = { "X-API-Key": apiKey };
 
-async function ambilSurat(id) {
+async function ambilDokumen(id) {
   const statusResponse = await fetch(\`\${baseUrl}/v1/jobs/\${id}\`, {
     headers,
   });
 
   if (!statusResponse.ok) {
-    throw new Error(\`Surat tidak ditemukan (\${statusResponse.status})\`);
+    throw new Error(\`Dokumen tidak ditemukan (\${statusResponse.status})\`);
   }
 
   const { job } = await statusResponse.json();
   if (job.status !== "completed") {
-    throw new Error(\`Surat belum selesai: \${job.status}\`);
+    throw new Error(\`Dokumen belum selesai: \${job.status}\`);
   }
 
-  const [pdfResponse, markdownResponse] = await Promise.all([
+  const [pdfResponse, markdownResponse, aiResultsResponse] = await Promise.all([
     fetch(\`\${baseUrl}\${job.pdfUrl}\`, { headers }),
     fetch(\`\${baseUrl}\${job.markdownUrl}\`, { headers }),
+    fetch(\`\${baseUrl}\${job.aiResultsUrl}\`, { headers }),
   ]);
 
-  if (!pdfResponse.ok || !markdownResponse.ok) {
-    throw new Error("File surat tidak dapat diambil.");
+  if (!pdfResponse.ok || !markdownResponse.ok || !aiResultsResponse.ok) {
+    throw new Error("Data dokumen tidak dapat diambil.");
   }
 
-  const [pdf, markdown] = await Promise.all([
+  const [pdf, markdown, ai] = await Promise.all([
     pdfResponse.blob(),
     markdownResponse.text(),
+    aiResultsResponse.json(),
   ]);
 
-  return { metadata: job, pdf, markdown };
+  return { metadata: job, pdf, markdown, aiResults: ai.results };
 }
 
-async function hapusSurat(id) {
-  const response = await fetch(\`\${baseUrl}/v1/jobs/\${id}\`, {
+async function hapusDokumen(jobUrl) {
+  const response = await fetch(\`\${baseUrl}\${jobUrl}\`, {
     method: "DELETE",
     headers,
   });
 
   if (!response.ok) {
-    throw new Error(\`Surat gagal dihapus (\${response.status})\`);
+    throw new Error(\`Dokumen gagal dihapus (\${response.status})\`);
   }
 }
 
-const surat = await ambilSurat(${JSON.stringify(job.id)});
-console.log(surat.markdown);
+const dokumen = await ambilDokumen(${JSON.stringify(job.id)});
+console.log(dokumen.markdown, dokumen.aiResults);
 
 // Jalankan hanya ketika data memang ingin dihapus:
-// await hapusSurat(${JSON.stringify(job.id)});`;
+// await hapusDokumen(dokumen.metadata.jobUrl);`;
 }
 
 function openFetchData(job) {
@@ -564,12 +1105,15 @@ function openFetchData(job) {
   const pdfUrl = job.pdfUrl ?? `/v1/jobs/${job.id}/pdf`;
   const markdownUrl =
     job.markdownUrl ?? `/v1/jobs/${job.id}/markdown`;
+  const aiResultsUrl =
+    job.aiResultsUrl ?? `/v1/jobs/${job.id}/ai`;
 
   elements.fetchDialogTitle.textContent = job.originalName;
   elements.fetchJobId.textContent = job.id;
   elements.fetchMetadataUrl.textContent = `${baseUrl}${jobUrl}`;
   elements.fetchPdfUrl.textContent = `${baseUrl}${pdfUrl}`;
   elements.fetchMarkdownUrl.textContent = `${baseUrl}${markdownUrl}`;
+  elements.fetchAiResultsUrl.textContent = `${baseUrl}${aiResultsUrl}`;
   elements.fetchDeleteUrl.textContent = `${baseUrl}${jobUrl}`;
   elements.fetchDownloadPdf.href = `${pdfUrl}?download=1`;
   elements.fetchDownloadMarkdown.href = `${markdownUrl}?download=1`;
@@ -579,9 +1123,11 @@ function openFetchData(job) {
 }
 
 async function deleteJob(job) {
-  const confirmed = window.confirm(
-    `Hapus "${job.originalName}" beserta PDF dan hasil Markdown-nya?`,
-  );
+  const confirmed = await confirmDeletion({
+    title: `Hapus “${job.originalName}”?`,
+    text: "PDF, Markdown, metadata, dan seluruh hasil Tanya AI akan dihapus secara permanen.",
+    confirmButtonText: "Hapus permanen",
+  });
   if (!confirmed) {
     return;
   }
@@ -625,6 +1171,40 @@ elements.clearSelection.addEventListener("click", () => {
 
 elements.uploadButton.addEventListener("click", uploadSelected);
 elements.refreshButton.addEventListener("click", () => refreshJobs());
+elements.aiConfigButton.addEventListener("click", openAiConfigDialog);
+elements.closeAiConfigDialog.addEventListener("click", closeAiConfigDialog);
+elements.aiConfigDialog.addEventListener("click", (event) => {
+  if (event.target === elements.aiConfigDialog) {
+    closeAiConfigDialog();
+  }
+});
+elements.aiConfigDialog.addEventListener("close", () => {
+  elements.aiToken.value = "";
+});
+elements.aiImportModels.addEventListener("click", importAiModels);
+elements.addAiTemplate.addEventListener("click", () => {
+  elements.aiTemplateList.append(createTemplateEditor());
+  elements.aiTemplateEmpty.hidden = true;
+});
+elements.saveAiConfig.addEventListener("click", saveAiConfiguration);
+elements.deleteAiConfig.addEventListener("click", deleteAiConfiguration);
+elements.closeAskAiDialog.addEventListener("click", closeAskAiDialog);
+elements.askAiDialog.addEventListener("click", (event) => {
+  if (event.target === elements.askAiDialog) {
+    closeAskAiDialog();
+  }
+});
+elements.askAiDialog.addEventListener("close", () => {
+  currentAiJob = null;
+});
+elements.askAiTemplate.addEventListener("change", () => {
+  const template = aiConfig.templates.find(
+    (candidate) => candidate.id === elements.askAiTemplate.value,
+  );
+  elements.askAiMessage.value = template?.prompt ?? "";
+  elements.askAiMessage.focus();
+});
+elements.executeAskAi.addEventListener("click", executeAskAi);
 elements.apiKeyButton.addEventListener("click", openApiKeyDialog);
 elements.closeApiKeyDialog.addEventListener("click", closeApiKeyDialog);
 elements.apiKeyDialog.addEventListener("click", (event) => {
@@ -697,7 +1277,7 @@ elements.copyMarkdown.addEventListener("click", async () => {
 });
 
 elements.copyJobId.addEventListener("click", async () => {
-  await copyText(elements.fetchJobId.textContent, "ID surat disalin.");
+  await copyText(elements.fetchJobId.textContent, "ID dokumen disalin.");
 });
 
 elements.copyFetchCode.addEventListener("click", async () => {
@@ -712,7 +1292,8 @@ for (const button of document.querySelectorAll("[data-copy-target]")) {
   });
 }
 
-await Promise.all([checkHealth(), refreshJobs()]);
+await Promise.all([checkHealth(), refreshAiConfig()]);
+await refreshJobs();
 refreshTimer = window.setInterval(() => {
   refreshJobs({ quiet: true });
   checkHealth();

@@ -4,6 +4,61 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) dan versi mengikuti
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-08-01
+
+### Added
+
+- Konfigurasi provider AI OpenAI-compatible dari dashboard, termasuk Base URL,
+  token opsional, pemeriksaan koneksi, dan import model melalui endpoint `/models`.
+- Client provider AI mengirim `stream: false` secara eksplisit serta mendukung
+  response JSON, SSE, dan NDJSON OpenAI-compatible.
+- Template pertanyaan AI yang dapat dibuat, dipilih, diedit, dan digunakan
+  kembali untuk PDF yang berbeda.
+- Model default yang dapat dipilih dari hasil import dan otomatis diprioritaskan
+  saat membuka dialog Tanya AI.
+- Tombol **Tanya AI** untuk setiap PDF selesai, dengan pilihan template, model,
+  prompt manual, serta riwayat jawaban persisten.
+- Penyimpanan hasil AI persisten di `data/jobs/.ai-results/` dan pembersihan
+  otomatis ketika job PDF asal dihapus.
+- Tombol **Salin link** endpoint hasil pada setiap jawaban AI.
+- Dialog konfirmasi SweetAlert2 untuk penghapusan job, konfigurasi AI, dan
+  pencabutan API key, dengan aset library yang disajikan secara lokal.
+- Endpoint Tanya AI berbasis sesi atau API key:
+  - `GET /v1/ai/models`
+  - `POST /v1/jobs/:jobId/ai`
+  - `GET /v1/jobs/:jobId/ai`
+  - `GET /v1/jobs/:jobId/ai/:aiId`
+- Response `POST /v1/jobs/:jobId/ai` menyertakan header `Location` menuju hasil
+  AI yang baru dibuat.
+- Endpoint `GET /v1/ai/models` mengembalikan model yang sudah diimpor, model
+  default, status konfigurasi, dan waktu pembaruan tanpa mengekspos token.
+- Object job menyertakan `aiModelsUrl` dan `aiResultsUrl`, sedangkan object hasil
+  AI menyertakan `jobUrl`, `aiModelsUrl`, `aiResultsUrl`, dan `resultUrl` agar
+  seluruh endpoint terkait dapat diikuti langsung tanpa menyusun path manual.
+- Response daftar hasil AI menyertakan URL job asal dan URL koleksi, serta
+  dashboard **Fetch Data** menampilkan endpoint hasil AI milik dokumen.
+- Automated test untuk kontrak provider AI, import model, default model,
+  eksekusi Tanya AI, fallback SSE, persistensi hasil, nested endpoint, dan URL
+  relasi antar-resource.
+
+### Changed
+
+- Endpoint health check dipindahkan dari `/health` ke `/v1/health` dan tetap
+  tersedia tanpa autentikasi.
+- Navigasi dashboard pada layar mobile menggunakan hamburger menu tanpa
+  menyembunyikan brand PDF2AI.
+- Focus ring pada form hanya menyorot input aktif, bukan seluruh wrapper label
+  dan teks bantuannya.
+- Input TOTP pada setup dan login menerima paste kode dengan separator, misalnya
+  `123 456` atau `123-456`.
+
+### Security
+
+- Token provider AI tidak pernah dikirim kembali secara lengkap ke browser atau
+  endpoint API setelah disimpan.
+- Hasil AI hanya dapat diakses melalui job asalnya; kombinasi `jobId` dan `aiId`
+  yang tidak sesuai ditolak sebagai resource yang tidak ditemukan.
+
 ## [1.1.0] - 2026-08-01
 
 ### Added
