@@ -4,6 +4,22 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) dan versi mengikuti
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-08-01
+
+### Added
+
+- Folder virtual persisten untuk mengelompokkan dokumen tanpa memindahkan file
+  fisiknya, lengkap dengan filter dashboard, pilihan folder saat upload,
+  pemindahan dokumen, ubah nama, dan penghapusan folder yang aman bagi PDF.
+- Endpoint `/v1/folders` untuk membaca isi dan mengelola folder dari dashboard,
+  serta `PATCH /v1/jobs/:id` untuk attach/detach dokumen.
+
+### Changed
+
+- API key dapat membaca daftar folder, melihat job di dalam folder, serta
+  attach/detach job. Pembuatan, rename, dan penghapusan folder dibatasi ke sesi
+  dashboard.
+
 ## [1.2.1] - 2026-08-01
 
 ### Added

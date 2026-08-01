@@ -20,6 +20,8 @@ tidak diperlukan untuk penggunaan dashboard sehari-hari.
 - Pemrosesan di latar belakang satu per satu dengan mode CPU atau akselerator
   GPU yang kompatibel.
 - Antrean dan data dokumen tetap tersedia setelah aplikasi dimulai ulang.
+- Folder virtual persisten untuk mengelompokkan dokumen tanpa memindahkan PDF
+  dari lokasi penyimpanan job.
 - OCR scan melalui Docling, RapidOCR, dan ONNX Runtime.
 - Fallback text layer untuk PDF digital dengan hasil parser yang rusak.
 - Viewer terpadu untuk PDF asli, metadata, dan Markdown.
@@ -28,6 +30,8 @@ tidak diperlukan untuk penggunaan dashboard sehari-hari.
 - Hapus job beserta PDF, metadata, dan Markdown.
 - Konfirmasi SweetAlert sebelum penghapusan permanen atau pencabutan akses.
 - HTTP API berbasis antrean untuk integrasi aplikasi lain.
+- API key dapat membaca daftar dan isi folder serta attach/detach dokumen;
+  pembuatan, rename, dan penghapusan folder hanya tersedia dari dashboard.
 - Dashboard responsif dengan tema terang dan gelap otomatis.
 - Login dengan kode TOTP 6 digit dari aplikasi authenticator standar, tanpa
   password tambahan.
@@ -110,19 +114,24 @@ kode TOTP 6 digit tanpa password.
 ## Menggunakan dashboard
 
 1. Masuk menggunakan kode TOTP 6 digit dari aplikasi authenticator.
-2. Pilih atau tarik satu atau beberapa PDF ke area upload, lalu klik
+2. Buat folder virtual melalui **Folder baru** bila dokumen perlu
+   dikelompokkan. Folder ini tidak memindahkan lokasi file fisik.
+3. Pilih folder tujuan, pilih atau tarik satu atau beberapa PDF ke area upload,
+   lalu klik
    **Masukkan ke antrean**.
-3. Pantau status **Mengantre**, **Memproses**, **Selesai**, atau **Gagal**.
-4. Pada dokumen yang selesai, klik **Lihat hasil** untuk membuka:
+4. Gunakan filter folder untuk membedakan dokumen. Tombol **Pindah** dapat
+   memindahkan dokumen ke folder lain atau ke **Tanpa folder**.
+5. Pantau status **Mengantre**, **Memproses**, **Selesai**, atau **Gagal**.
+6. Pada dokumen yang selesai, klik **Lihat hasil** untuk membuka:
    - PDF asli;
    - informasi pemrosesan; dan
    - hasil Markdown.
-5. Buka **Konfigurasi → AI** untuk menghubungkan provider, memeriksa token,
+7. Buka **Konfigurasi → AI** untuk menghubungkan provider, memeriksa token,
    mengimpor model, memilih model default, dan membuat template pertanyaan.
    Tombol **Tanya AI** akan tersedia setelah konfigurasi valid.
-6. Buka **Konfigurasi → API Key** jika aplikasi lain perlu mengambil data
+8. Buka **Konfigurasi → API Key** jika aplikasi lain perlu mengambil data
    PDF2AI. Panduan lengkap tersedia melalui menu **Docs**.
-7. Gunakan tombol **Hapus** hanya jika Anda ingin menghapus PDF dan seluruh
+9. Gunakan tombol **Hapus** hanya jika Anda ingin menghapus PDF dan seluruh
    hasilnya secara permanen.
 
 Browser boleh ditutup setelah upload selesai. Job akan terus diproses oleh
@@ -207,9 +216,15 @@ Endpoint `/v1/health` tetap tersedia tanpa autentikasi untuk health check.
 | --- | --- | --- |
 | `GET` | `/v1/health` | Status API, OCR, dan statistik antrean |
 | `GET` | `/v1/ai/models` | Daftar model AI tersimpan dan model default |
+| `GET` | `/v1/folders` | Daftar folder virtual dan jumlah job |
+| `GET` | `/v1/folders/:id` | Detail folder dan daftar job di dalamnya |
+| `POST` | `/v1/folders` | Membuat folder virtual (dashboard saja) |
+| `PATCH` | `/v1/folders/:id` | Mengubah nama folder (dashboard saja) |
+| `DELETE` | `/v1/folders/:id` | Menghapus folder (dashboard saja) |
 | `POST` | `/v1/jobs` | Membuat job background |
 | `GET` | `/v1/jobs` | Daftar job dan statistik |
 | `GET` | `/v1/jobs/:id` | Metadata, status, dan URL resource job |
+| `PATCH` | `/v1/jobs/:id` | Memindahkan job ke folder virtual |
 | `GET` | `/v1/jobs/:id/pdf` | PDF asli |
 | `GET` | `/v1/jobs/:id/markdown` | Markdown hasil ekstraksi |
 | `DELETE` | `/v1/jobs/:id` | Menghapus job dan seluruh file |
@@ -219,10 +234,12 @@ Endpoint `/v1/health` tetap tersedia tanpa autentikasi untuk health check.
 
 ### Upload PDF
 
-Kirim tepat satu PDF melalui multipart field bernama `file`:
+Kirim tepat satu PDF melalui multipart field bernama `file`. Field
+`folderId` bersifat opsional dan harus dikirim sebelum field `file`:
 
 ```bash
-curl -F "file=@document.pdf;type=application/pdf" \
+curl -F "folderId=FOLDER_ID" \
+  -F "file=@document.pdf;type=application/pdf" \
   -H "X-API-Key: $PDF2AI_API_KEY" \
   http://127.0.0.1:3000/v1/jobs
 ```
@@ -245,6 +262,12 @@ Content-Type: application/json
     "createdAt": "2026-07-30T08:00:00.000Z",
     "startedAt": null,
     "completedAt": null,
+    "folderId": "FOLDER_ID",
+    "folder": {
+      "id": "FOLDER_ID",
+      "name": "Invoice 2026"
+    },
+    "folderUrl": "/v1/folders/FOLDER_ID",
     "jobUrl": "/v1/jobs/2a6cf34e-7c27-4ba8-afcc-8c91339e3f0c",
     "pdfUrl": "/v1/jobs/2a6cf34e-7c27-4ba8-afcc-8c91339e3f0c/pdf",
     "markdownUrl": null,
@@ -274,6 +297,22 @@ atau mengambil daftar hasil AI. Dengan demikian client cukup mengikuti URL pada
 response dan tidak perlu menyusun path endpoint turunannya sendiri.
 `aiModelsUrl` mengarah ke daftar model AI yang dapat digunakan saat membuat
 pertanyaan.
+
+### Folder virtual
+
+Folder hanya menjadi metadata pengelompokan; PDF tetap berada di direktori job
+yang sama. API key dapat mengambil daftar folder melalui `GET /v1/folders` dan
+melihat seluruh job di dalam sebuah folder melalui `GET /v1/folders/FOLDER_ID`.
+
+Untuk attach job yang sudah ada, kirim `PATCH /v1/jobs/JOB_ID` dengan body
+`{"folderId":"FOLDER_ID"}`. Gunakan `{"folderId":null}` untuk detach dan
+mengembalikannya ke **Tanpa folder**. Upload baru juga dapat langsung di-attach
+dengan multipart field `folderId`.
+
+Pembuatan, perubahan nama, dan penghapusan folder hanya tersedia melalui sesi
+dashboard. Request dengan API key ke operasi tersebut mendapat HTTP `403`.
+Menghapus folder dari dashboard memindahkan seluruh job di dalamnya ke
+**Tanpa folder**; PDF, Markdown, dan hasil Tanya AI tidak ikut dihapus.
 
 ### Ambil PDF
 
@@ -571,6 +610,8 @@ data/jobs/<job-id>/
 
 data/jobs/.ai-results/
 └── <hasil-ai-id>.json
+
+data/jobs/.folders.json
 
 data/app-config.json
 ```

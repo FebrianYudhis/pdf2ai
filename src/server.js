@@ -35,6 +35,7 @@ import {
   plainTextToMarkdown,
   shouldUseTextFallback,
 } from "./pdf-text-fallback.js";
+import { FolderError, FolderStore } from "./folder-store.js";
 
 class HttpError extends Error {
   constructor(statusCode, message) {
@@ -415,9 +416,24 @@ export async function extractMarkdown(path, config) {
   return markdown;
 }
 
-function serializeJob(job) {
+function serializeFolder(folder, jobCount = undefined) {
+  return {
+    ...folder,
+    folderUrl: `/v1/folders/${folder.id}`,
+    ...(jobCount === undefined ? {} : { jobCount }),
+  };
+}
+
+function serializeJob(job, folders) {
+  const folder = folders?.find(job.folderId);
   return {
     ...job,
+    // Referensi folder yang sudah tidak ada diperlakukan sebagai "Tanpa folder".
+    // Ini menjaga job lama tetap terlihat bila file folder dipulihkan/diubah
+    // secara terpisah dari metadata job.
+    folderId: folder?.id ?? null,
+    folder: folder ? serializeFolder(folder) : null,
+    folderUrl: folder ? `/v1/folders/${folder.id}` : null,
     jobUrl: `/v1/jobs/${job.id}`,
     pdfUrl: `/v1/jobs/${job.id}/pdf`,
     markdownUrl:
@@ -479,6 +495,11 @@ export async function buildServer({
   });
   await jobs.init();
   app.decorate("jobs", jobs);
+  const folders = new FolderStore({
+    path: config.folderFile ?? join(dataDirectory, ".folders.json"),
+  });
+  await folders.init();
+  app.decorate("folders", folders);
   const aiResults = new AiResultStore({
     directory:
       config.aiResultDirectory ?? join(dataDirectory, ".ai-results"),
@@ -551,6 +572,15 @@ export async function buildServer({
     );
   }
 
+  async function requireDashboardSession(request) {
+    if (!isAuthenticated(request)) {
+      throw new HttpError(
+        403,
+        "Pembuatan, perubahan nama, dan penghapusan folder hanya tersedia dari dashboard.",
+      );
+    }
+  }
+
   app.addHook("onRequest", async (request, reply) => {
     if (!authEnabled) {
       return;
@@ -593,8 +623,8 @@ export async function buildServer({
   await app.register(multipart, {
     limits: {
       files: 1,
-      fields: 0,
-      parts: 1,
+      fields: 1,
+      parts: 2,
       fileSize: maxBytes,
     },
   });
@@ -1079,6 +1109,93 @@ export async function buildServer({
     };
   });
 
+  function folderCollection() {
+    const allJobs = jobs.list();
+    const counts = new Map();
+    let unfiledCount = 0;
+    for (const job of allJobs) {
+      if (job.folderId && folders.has(job.folderId)) {
+        counts.set(job.folderId, (counts.get(job.folderId) ?? 0) + 1);
+      } else {
+        unfiledCount += 1;
+      }
+    }
+    return {
+      foldersUrl: "/v1/folders",
+      folders: folders
+        .list()
+        .map((folder) => serializeFolder(folder, counts.get(folder.id) ?? 0)),
+      unfiledCount,
+      totalJobCount: allJobs.length,
+    };
+  }
+
+  app.get("/v1/folders", async () => folderCollection());
+
+  app.post(
+    "/v1/folders",
+    {
+      preHandler: requireDashboardSession,
+      schema: {
+        body: {
+          type: "object",
+          required: ["name"],
+          additionalProperties: false,
+          properties: { name: { type: "string", minLength: 1, maxLength: 80 } },
+        },
+      },
+    },
+    async (request, reply) => {
+      const folder = await folders.create(request.body.name);
+      const serialized = serializeFolder(folder, 0);
+      reply.header("Location", serialized.folderUrl);
+      return reply.code(201).send({ folder: serialized });
+    },
+  );
+
+  app.get("/v1/folders/:id", async (request) => {
+    const folder = folders.get(request.params.id);
+    const folderJobs = jobs
+      .list()
+      .filter((job) => job.folderId === folder.id)
+      .map((job) => serializeJob(job, folders));
+    return {
+      folder: serializeFolder(folder, folderJobs.length),
+      jobs: folderJobs,
+    };
+  });
+
+  app.patch(
+    "/v1/folders/:id",
+    {
+      preHandler: requireDashboardSession,
+      schema: {
+        body: {
+          type: "object",
+          required: ["name"],
+          additionalProperties: false,
+          properties: { name: { type: "string", minLength: 1, maxLength: 80 } },
+        },
+      },
+    },
+    async (request) => {
+      const folder = await folders.rename(request.params.id, request.body.name);
+      const count = jobs.list().filter((job) => job.folderId === folder.id).length;
+      return { folder: serializeFolder(folder, count) };
+    },
+  );
+
+  app.delete(
+    "/v1/folders/:id",
+    { preHandler: requireDashboardSession },
+    async (request, reply) => {
+      const folder = folders.get(request.params.id);
+      await jobs.clearFolder(folder.id);
+      await folders.delete(folder.id);
+      return reply.code(204).send();
+    },
+  );
+
   async function receiveJob(request) {
     const upload = await request.file();
     if (!upload) {
@@ -1091,10 +1208,21 @@ export async function buildServer({
       upload.file.resume();
       throw new HttpError(400, "Nama multipart field harus 'file'.");
     }
+    const folderField = upload.fields?.folderId;
+    const folderId = folderField?.value ? String(folderField.value) : null;
+    if (folderId) {
+      try {
+        folders.get(folderId);
+      } catch (error) {
+        upload.file.resume();
+        throw error;
+      }
+    }
 
     return jobs.create({
       originalName: upload.filename,
       stream: upload.file,
+      folderId,
       validate: async (path, stream) => {
         if (stream.truncated) {
           throw new HttpError(
@@ -1110,17 +1238,45 @@ export async function buildServer({
   app.post("/v1/jobs", async (request, reply) => {
     const job = await receiveJob(request);
     reply.header("Location", `/v1/jobs/${job.id}`);
-    return reply.code(202).send({ job: serializeJob(job) });
+    return reply.code(202).send({ job: serializeJob(job, folders) });
   });
 
   app.get("/v1/jobs", async () => ({
-    jobs: jobs.list().map(serializeJob),
+    jobs: jobs.list().map((job) => serializeJob(job, folders)),
     stats: jobs.stats(),
   }));
 
   app.get("/v1/jobs/:id", async (request) => ({
-    job: serializeJob(jobs.get(request.params.id)),
+    job: serializeJob(jobs.get(request.params.id), folders),
   }));
+
+  app.patch(
+    "/v1/jobs/:id",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["folderId"],
+          additionalProperties: false,
+          properties: {
+            folderId: {
+              anyOf: [
+                { type: "string", pattern: "^[0-9a-fA-F-]{36}$" },
+                { type: "null" },
+              ],
+            },
+          },
+        },
+      },
+    },
+    async (request) => {
+      if (request.body.folderId) {
+        folders.get(request.body.folderId);
+      }
+      const job = await jobs.move(request.params.id, request.body.folderId);
+      return { job: serializeJob(job, folders) };
+    },
+  );
 
   app.get("/v1/jobs/:id/pdf", async (request, reply) => {
     const job = jobs.get(request.params.id);
@@ -1247,6 +1403,7 @@ export async function buildServer({
     if (
       error instanceof HttpError ||
       error instanceof AiError ||
+      error instanceof FolderError ||
       error instanceof JobError ||
       (error.statusCode && error.statusCode < 500)
     ) {

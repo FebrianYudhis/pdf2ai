@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { randomUUID } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -125,10 +126,20 @@ function multipartPdf(
   fieldName = "file",
   content = "%PDF-1.7\ntest",
   filename = "test.pdf",
+  folderId = null,
 ) {
   const boundary = "----odl-pdf-test";
+  const folderPart = folderId
+    ? [
+        `--${boundary}`,
+        'Content-Disposition: form-data; name="folderId"',
+        "",
+        folderId,
+      ]
+    : [];
   const body = Buffer.from(
     [
+      ...folderPart,
       `--${boundary}`,
       `Content-Disposition: form-data; name="${fieldName}"; filename="${filename}"`,
       "Content-Type: application/pdf",
@@ -147,6 +158,143 @@ function multipartPdf(
     },
   };
 }
+
+test("folder virtual mengelompokkan job tanpa memindahkan file fisik", async (t) => {
+  const config = testConfig();
+  const app = await buildServer({
+    config,
+    extractor: async () => "# Folder virtual",
+  });
+  t.after(() => app.close());
+
+  const created = await app.inject({
+    method: "POST",
+    url: "/v1/folders",
+    payload: { name: "  Invoice 2026  " },
+  });
+  assert.equal(created.statusCode, 201);
+  const folder = created.json().folder;
+  assert.equal(folder.name, "Invoice 2026");
+  assert.equal(created.headers.location, `/v1/folders/${folder.id}`);
+
+  const duplicate = await app.inject({
+    method: "POST",
+    url: "/v1/folders",
+    payload: { name: "invoice 2026" },
+  });
+  assert.equal(duplicate.statusCode, 409);
+
+  const missingFolderUpload = await app.inject({
+    method: "POST",
+    url: "/v1/jobs",
+    ...multipartPdf(
+      "file",
+      "%PDF-1.7\nmissing-folder",
+      "missing-folder.pdf",
+      randomUUID(),
+    ),
+  });
+  assert.equal(missingFolderUpload.statusCode, 404);
+  assert.equal(app.jobs.list().length, 0);
+
+  const upload = await app.inject({
+    method: "POST",
+    url: "/v1/jobs",
+    ...multipartPdf("file", "%PDF-1.7\nfolder", "invoice.pdf", folder.id),
+  });
+  assert.equal(upload.statusCode, 202);
+  assert.equal(upload.json().job.folderId, folder.id);
+  assert.equal(upload.json().job.folder.name, "Invoice 2026");
+  const jobId = upload.json().job.id;
+  await app.jobs.waitForIdle();
+
+  const collection = await app.inject({ method: "GET", url: "/v1/folders" });
+  assert.equal(collection.statusCode, 200);
+  assert.equal(collection.json().folders[0].jobCount, 1);
+  assert.equal(collection.json().unfiledCount, 0);
+
+  const folderContents = await app.inject({
+    method: "GET",
+    url: `/v1/folders/${folder.id}`,
+  });
+  assert.equal(folderContents.statusCode, 200);
+  assert.equal(folderContents.json().folder.jobCount, 1);
+  assert.equal(folderContents.json().jobs.length, 1);
+  assert.equal(folderContents.json().jobs[0].id, jobId);
+
+  const renamed = await app.inject({
+    method: "PATCH",
+    url: `/v1/folders/${folder.id}`,
+    payload: { name: "Arsip Invoice" },
+  });
+  assert.equal(renamed.statusCode, 200);
+  assert.equal(renamed.json().folder.name, "Arsip Invoice");
+
+  const movedOut = await app.inject({
+    method: "PATCH",
+    url: `/v1/jobs/${jobId}`,
+    payload: { folderId: null },
+  });
+  assert.equal(movedOut.statusCode, 200);
+  assert.equal(movedOut.json().job.folder, null);
+
+  await app.inject({
+    method: "PATCH",
+    url: `/v1/jobs/${jobId}`,
+    payload: { folderId: folder.id },
+  });
+  const deleted = await app.inject({
+    method: "DELETE",
+    url: `/v1/folders/${folder.id}`,
+  });
+  assert.equal(deleted.statusCode, 204);
+
+  const detail = await app.inject({ method: "GET", url: `/v1/jobs/${jobId}` });
+  assert.equal(detail.json().job.folderId, null);
+  assert.equal(detail.json().job.folder, null);
+  assert.equal(existsSync(join(config.dataDirectory, jobId, "input.pdf")), true);
+
+  await app.jobs.move(jobId, randomUUID());
+  const staleReference = await app.inject({
+    method: "GET",
+    url: `/v1/jobs/${jobId}`,
+  });
+  assert.equal(staleReference.json().job.folderId, null);
+  assert.equal(staleReference.json().job.folder, null);
+  assert.equal(staleReference.json().job.folderUrl, null);
+});
+
+test("folder dan penempatan job dimuat kembali setelah restart", async (t) => {
+  const config = testConfig();
+  const extractor = async () => "# Persisten";
+  const firstApp = await buildServer({ config, extractor });
+
+  const created = await firstApp.inject({
+    method: "POST",
+    url: "/v1/folders",
+    payload: { name: "Dokumen Legal" },
+  });
+  const folderId = created.json().folder.id;
+  const uploaded = await firstApp.inject({
+    method: "POST",
+    url: "/v1/jobs",
+    ...multipartPdf("file", "%PDF-1.7\npersist", "legal.pdf", folderId),
+  });
+  const jobId = uploaded.json().job.id;
+  await firstApp.jobs.waitForIdle();
+  await firstApp.close();
+
+  const secondApp = await buildServer({ config, extractor });
+  t.after(() => secondApp.close());
+
+  const folders = await secondApp.inject({ method: "GET", url: "/v1/folders" });
+  assert.equal(folders.json().folders[0].id, folderId);
+  assert.equal(folders.json().folders[0].jobCount, 1);
+
+  const job = await secondApp.inject({ method: "GET", url: `/v1/jobs/${jobId}` });
+  assert.equal(job.json().job.folderId, folderId);
+  assert.equal(job.json().job.folder.name, "Dokumen Legal");
+});
 
 test("dashboard dan health endpoint tersedia", async (t) => {
   const app = await buildServer({ config: testConfig() });
@@ -184,6 +332,8 @@ test("dashboard dan health endpoint tersedia", async (t) => {
   assert.match(docs.body, /Integrasikan PDF2AI\./);
   assert.match(docs.body, /X-API-Key/);
   assert.match(docs.body, /\/v1\/jobs/);
+  assert.match(docs.body, /\/v1\/folders\/:id/);
+  assert.match(docs.body, /403 Forbidden/);
   assert.match(docs.body, /POST<\/span>\s*<code>\/v1\/jobs\/:jobId\/ai<\/code>/);
   assert.match(docs.body, /aiResultsUrl/);
   assert.match(docs.body, /resultUrl/);
@@ -210,7 +360,10 @@ test("setup TOTP sekali lalu login hanya memerlukan kode TOTP", async (t) => {
     sessionHours: 1,
   };
   config.authFile = join(config.dataDirectory, "auth.json");
-  const app = await buildServer({ config });
+  const app = await buildServer({
+    config,
+    extractor: async () => "# Auth folder",
+  });
   t.after(() => app.close());
 
   const [dashboard, docs, api, setupPage, font, health] = await Promise.all([
@@ -310,6 +463,107 @@ test("setup TOTP sekali lalu login hanya memerlukan kode TOTP", async (t) => {
   const firstApiKey = generated.json().apiKey;
   assert.match(firstApiKey, /^p2ai_[A-Za-z0-9_-]{40,}$/);
   assert.equal(readFileSync(config.authFile, "utf8").includes(firstApiKey), false);
+
+  const createdFolder = await app.inject({
+    method: "POST",
+    url: "/v1/folders",
+    headers: { cookie },
+    payload: { name: "Folder API" },
+  });
+  assert.equal(createdFolder.statusCode, 201);
+  const folderId = createdFolder.json().folder.id;
+
+  const apiCannotCreateFolder = await app.inject({
+    method: "POST",
+    url: "/v1/folders",
+    headers: { "x-api-key": firstApiKey },
+    payload: { name: "Ditolak" },
+  });
+  assert.equal(apiCannotCreateFolder.statusCode, 403);
+
+  const apiCannotRenameFolder = await app.inject({
+    method: "PATCH",
+    url: `/v1/folders/${folderId}`,
+    headers: { "x-api-key": firstApiKey },
+    payload: { name: "Ditolak juga" },
+  });
+  assert.equal(apiCannotRenameFolder.statusCode, 403);
+
+  const apiCannotDeleteFolder = await app.inject({
+    method: "DELETE",
+    url: `/v1/folders/${folderId}`,
+    headers: { "x-api-key": firstApiKey },
+  });
+  assert.equal(apiCannotDeleteFolder.statusCode, 403);
+
+  const uploadData = multipartPdf("file", "%PDF-1.7\napi-folder", "api.pdf");
+  const uploaded = await app.inject({
+    method: "POST",
+    url: "/v1/jobs",
+    headers: { ...uploadData.headers, cookie },
+    payload: uploadData.payload,
+  });
+  assert.equal(uploaded.statusCode, 202);
+  const jobId = uploaded.json().job.id;
+  await app.jobs.waitForIdle();
+
+  const apiFolderList = await app.inject({
+    method: "GET",
+    url: "/v1/folders",
+    headers: { "x-api-key": firstApiKey },
+  });
+  assert.equal(apiFolderList.statusCode, 200);
+  assert.equal(apiFolderList.json().folders[0].id, folderId);
+
+  const attached = await app.inject({
+    method: "PATCH",
+    url: `/v1/jobs/${jobId}`,
+    headers: { "x-api-key": firstApiKey },
+    payload: { folderId },
+  });
+  assert.equal(attached.statusCode, 200);
+  assert.equal(attached.json().job.folderId, folderId);
+
+  const apiFolderContents = await app.inject({
+    method: "GET",
+    url: `/v1/folders/${folderId}`,
+    headers: { "x-api-key": firstApiKey },
+  });
+  assert.equal(apiFolderContents.statusCode, 200);
+  assert.equal(apiFolderContents.json().jobs.length, 1);
+  assert.equal(apiFolderContents.json().jobs[0].id, jobId);
+
+  const detached = await app.inject({
+    method: "PATCH",
+    url: `/v1/jobs/${jobId}`,
+    headers: { "x-api-key": firstApiKey },
+    payload: { folderId: null },
+  });
+  assert.equal(detached.statusCode, 200);
+  assert.equal(detached.json().job.folderId, null);
+
+  const emptyFolder = await app.inject({
+    method: "GET",
+    url: `/v1/folders/${folderId}`,
+    headers: { "x-api-key": firstApiKey },
+  });
+  assert.equal(emptyFolder.json().folder.jobCount, 0);
+  assert.deepEqual(emptyFolder.json().jobs, []);
+
+  const renamedFromDashboard = await app.inject({
+    method: "PATCH",
+    url: `/v1/folders/${folderId}`,
+    headers: { cookie },
+    payload: { name: "Folder API diperbarui" },
+  });
+  assert.equal(renamedFromDashboard.statusCode, 200);
+
+  const deletedFromDashboard = await app.inject({
+    method: "DELETE",
+    url: `/v1/folders/${folderId}`,
+    headers: { cookie },
+  });
+  assert.equal(deletedFromDashboard.statusCode, 204);
 
   const externalWithKey = await app.inject({
     method: "GET",

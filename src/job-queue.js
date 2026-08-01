@@ -31,6 +31,7 @@ function publicJob(job) {
     startedAt,
     completedAt,
     error,
+    folderId,
   } = job;
 
   return {
@@ -41,6 +42,7 @@ function publicJob(job) {
     createdAt,
     startedAt,
     completedAt,
+    folderId: folderId ?? null,
     ...(error ? { error } : {}),
   };
 }
@@ -105,7 +107,7 @@ export class JobQueue {
     this.#schedule();
   }
 
-  async create({ originalName, stream, validate }) {
+  async create({ originalName, stream, validate, folderId = null }) {
     const id = randomUUID();
     const directory = this.#jobDirectory(id);
     const inputPath = join(directory, "input.pdf");
@@ -124,6 +126,7 @@ export class JobQueue {
         startedAt: null,
         completedAt: null,
         error: null,
+        folderId,
       };
 
       await this.#persist(job);
@@ -145,6 +148,30 @@ export class JobQueue {
 
   get(id) {
     return publicJob(this.#require(id));
+  }
+
+  async move(id, folderId) {
+    const job = this.#require(id);
+    const previousFolderId = job.folderId ?? null;
+    job.folderId = folderId ?? null;
+    try {
+      await this.#persist(job);
+    } catch (error) {
+      job.folderId = previousFolderId;
+      throw error;
+    }
+    return publicJob(job);
+  }
+
+  async clearFolder(folderId) {
+    const affected = [...this.jobs.values()].filter(
+      (job) => job.folderId === folderId,
+    );
+    for (const job of affected) {
+      job.folderId = null;
+      await this.#persist(job);
+    }
+    return affected.length;
   }
 
   stats() {

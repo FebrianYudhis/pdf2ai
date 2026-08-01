@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Dokumentasi HTTP API PDF2AI untuk upload, pemrosesan PDF, Markdown, dan hasil Tanya AI."
+      content="Dokumentasi HTTP API PDF2AI untuk folder virtual, upload, pemrosesan PDF, Markdown, dan hasil Tanya AI."
     />
     <title>API Docs — PDF2AI</title>
     <link rel="stylesheet" href="/styles.css" />
@@ -44,6 +44,7 @@
         <nav>
           <a href="#health"><span class="nav-method get">GET</span> Health</a>
           <a href="#ai-models"><span class="nav-method get">GET</span> Model AI</a>
+          <a href="#folders"><span class="nav-method get">GET</span> Isi folder</a>
           <a href="#create-job"><span class="nav-method post">POST</span> Buat job</a>
           <a href="#list-jobs"><span class="nav-method get">GET</span> Daftar job</a>
           <a href="#job-status"><span class="nav-method get">GET</span> Status job</a>
@@ -261,6 +262,73 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
           </p>
         </section>
 
+        <section class="docs-section endpoint-section" id="folders">
+          <div class="endpoint-title stacked-title">
+            <div><span class="method-badge get">GET</span><code>/v1/folders</code></div>
+            <div><span class="method-badge get">GET</span><code>/v1/folders/:id</code></div>
+            <span class="auth-badge">API KEY</span>
+          </div>
+          <p>
+            Mengambil daftar folder virtual atau detail sebuah folder beserta
+            seluruh job di dalamnya. Folder hanya menyimpan metadata
+            pengelompokan dan tidak mengubah lokasi fisik PDF.
+          </p>
+
+          <div class="code-sample docs-code-sample">
+            <div class="code-sample-header">
+              <span>cURL · Baca, attach, dan detach</span>
+              <button class="code-copy-button" type="button" data-copy="#folder-code">Salin</button>
+            </div>
+            <pre id="folder-code" data-code tabindex="0"># Daftar folder dan jumlah job
+curl {{BASE_URL}}/v1/folders \
+  -H "X-API-Key: $PDF2AI_API_KEY"
+
+# Detail folder beserta seluruh job di dalamnya
+curl {{BASE_URL}}/v1/folders/FOLDER_ID \
+  -H "X-API-Key: $PDF2AI_API_KEY"
+
+# Attach job ke folder
+curl -X PATCH {{BASE_URL}}/v1/jobs/JOB_ID \
+  -H "X-API-Key: $PDF2AI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"folderId":"FOLDER_ID"}'
+
+# Detach job ke Tanpa folder
+curl -X PATCH {{BASE_URL}}/v1/jobs/JOB_ID \
+  -H "X-API-Key: $PDF2AI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"folderId":null}'</pre>
+          </div>
+
+          <p class="response-note">
+            <code>GET /v1/folders</code> mengembalikan <code>jobCount</code>
+            per folder, <code>unfiledCount</code>, dan <code>totalJobCount</code>.
+            Detail folder mengembalikan array <code>jobs</code> berisi object job
+            lengkap. Pembuatan, rename, dan penghapusan folder hanya tersedia
+            melalui sesi dashboard; API key akan menerima <strong>403 Forbidden</strong>.
+          </p>
+
+          <details class="response-details">
+            <summary>Bentuk response detail folder · 200 OK</summary>
+            <pre>{
+  "folder": {
+    "id": "FOLDER_ID",
+    "name": "Invoice 2026",
+    "jobCount": 1,
+    "folderUrl": "/v1/folders/FOLDER_ID"
+  },
+  "jobs": [
+    {
+      "id": "JOB_ID",
+      "originalName": "invoice.pdf",
+      "folderId": "FOLDER_ID",
+      "jobUrl": "/v1/jobs/JOB_ID"
+    }
+  ]
+}</pre>
+          </details>
+        </section>
+
         <section class="docs-section endpoint-section" id="create-job">
           <div class="endpoint-title">
             <span class="method-badge post">POST</span>
@@ -269,13 +337,15 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
           </div>
           <p>
             Membuat job background. Kirim tepat satu PDF melalui multipart field
-            bernama <code>file</code>. Batas default adalah 25 MB.
+            bernama <code>file</code>. Folder tujuan dapat dikirim melalui
+            <code>folderId</code> sebelum field file. Batas default adalah 25 MB.
           </p>
 
           <div class="parameter-table-wrap">
             <table class="parameter-table">
               <thead><tr><th>Field</th><th>Tipe</th><th>Wajib</th><th>Keterangan</th></tr></thead>
               <tbody>
+                <tr><td><code>folderId</code></td><td>UUID</td><td>Tidak</td><td>Folder tujuan; kirim sebelum field <code>file</code>.</td></tr>
                 <tr><td><code>file</code></td><td>PDF binary</td><td>Ya</td><td>File dengan signature PDF yang valid.</td></tr>
               </tbody>
             </table>
@@ -287,7 +357,8 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
                 <span>cURL</span>
                 <button class="code-copy-button" type="button" data-copy="#create-curl">Salin</button>
               </div>
-              <pre id="create-curl" data-code tabindex="0">curl -F "file=@document.pdf;type=application/pdf" \
+              <pre id="create-curl" data-code tabindex="0">curl -F "folderId=FOLDER_ID" \
+  -F "file=@document.pdf;type=application/pdf" \
   -H "X-API-Key: $PDF2AI_API_KEY" \
   {{BASE_URL}}/v1/jobs</pre>
             </div>
@@ -298,6 +369,7 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
                 <button class="code-copy-button" type="button" data-copy="#create-js">Salin</button>
               </div>
               <pre id="create-js" data-code tabindex="0">const form = new FormData();
+form.set("folderId", "FOLDER_ID");
 form.set("file", new Blob([pdfBuffer], {
   type: "application/pdf",
 }), "document.pdf");
@@ -323,6 +395,12 @@ const { job } = await response.json();</pre>
     "createdAt": "2026-08-01T08:00:00.000Z",
     "startedAt": null,
     "completedAt": null,
+    "folderId": "FOLDER_ID",
+    "folder": {
+      "id": "FOLDER_ID",
+      "name": "Invoice 2026"
+    },
+    "folderUrl": "/v1/folders/FOLDER_ID",
     "jobUrl": "/v1/jobs/2a6cf34e-7c27-4ba8-afcc-8c91339e3f0c",
     "pdfUrl": "/v1/jobs/2a6cf34e-7c27-4ba8-afcc-8c91339e3f0c/pdf",
     "markdownUrl": null,
@@ -402,6 +480,12 @@ const { job } = await response.json();</pre>
     "id": "JOB_ID",
     "originalName": "document.pdf",
     "status": "completed",
+    "folderId": "FOLDER_ID",
+    "folder": {
+      "id": "FOLDER_ID",
+      "name": "Invoice 2026"
+    },
+    "folderUrl": "/v1/folders/FOLDER_ID",
     "jobUrl": "/v1/jobs/JOB_ID",
     "pdfUrl": "/v1/jobs/JOB_ID/pdf",
     "markdownUrl": "/v1/jobs/JOB_ID/markdown",
@@ -623,6 +707,9 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
                 <tr><td><code>startedAt</code></td><td>ISO 8601 | null</td><td>Waktu pemrosesan dimulai.</td></tr>
                 <tr><td><code>completedAt</code></td><td>ISO 8601 | null</td><td>Waktu pemrosesan berakhir.</td></tr>
                 <tr><td><code>error</code></td><td>string | null</td><td>Pesan kegagalan jika status <code>failed</code>.</td></tr>
+                <tr><td><code>folderId</code></td><td>UUID | null</td><td>Identifier folder virtual.</td></tr>
+                <tr><td><code>folder</code></td><td>object | null</td><td>Metadata folder virtual saat ini.</td></tr>
+                <tr><td><code>folderUrl</code></td><td>string | null</td><td>URL relatif detail folder.</td></tr>
                 <tr><td><code>jobUrl</code></td><td>string</td><td>URL relatif metadata job.</td></tr>
                 <tr><td><code>pdfUrl</code></td><td>string</td><td>URL relatif PDF sumber.</td></tr>
                 <tr><td><code>markdownUrl</code></td><td>string | null</td><td>Tersedia setelah status <code>completed</code>.</td></tr>
@@ -678,6 +765,7 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
           <div class="error-list">
             <div><strong>400</strong><span><b>Bad Request</b> — field multipart salah atau request tidak valid.</span></div>
             <div><strong>401</strong><span><b>Unauthorized</b> — API key hilang, salah, dicabut, atau sudah dirotasi.</span></div>
+            <div><strong>403</strong><span><b>Forbidden</b> — operasi hanya tersedia melalui sesi dashboard.</span></div>
             <div><strong>404</strong><span><b>Not Found</b> — ID job tidak ditemukan.</span></div>
             <div><strong>409</strong><span><b>Conflict</b> — hasil belum siap atau status job tidak mengizinkan aksi.</span></div>
             <div><strong>413</strong><span><b>Payload Too Large</b> — PDF melebihi batas ukuran.</span></div>

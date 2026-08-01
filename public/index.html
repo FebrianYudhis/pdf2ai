@@ -129,6 +129,16 @@
             <ul id="selection-list"></ul>
           </div>
 
+          <label class="upload-folder-field" for="upload-folder">
+            <span>
+              <strong>Folder tujuan</strong>
+              <small>Opsional · hanya untuk pengelompokan</small>
+            </span>
+            <select id="upload-folder">
+              <option value="">Tanpa folder</option>
+            </select>
+          </label>
+
           <button class="primary-button" id="upload-button" type="button" disabled>
             <span id="upload-button-label">Masukkan ke antrean</span>
             <span aria-hidden="true">→</span>
@@ -161,6 +171,18 @@
             </button>
           </div>
 
+          <div class="folder-toolbar">
+            <div class="folder-filter-list" id="folder-filter-list" role="group" aria-label="Filter folder">
+              <button class="folder-filter active" type="button" data-folder-filter="all">
+                <span>Semua dokumen</span><small>0</small>
+              </button>
+            </div>
+            <div class="folder-toolbar-actions">
+              <button class="folder-manage-button" id="manage-folder-button" type="button" hidden>Kelola</button>
+              <button class="folder-create-button" id="create-folder-button" type="button"><span aria-hidden="true">＋</span> Folder baru</button>
+            </div>
+          </div>
+
           <div class="job-table-head" aria-hidden="true">
             <span>Dokumen</span>
             <span>Status</span>
@@ -171,8 +193,8 @@
           <div class="job-list" id="job-list" aria-live="polite">
             <div class="empty-state" id="empty-state">
               <span class="empty-mark" aria-hidden="true">PDF</span>
-              <h3>Belum ada dokumen</h3>
-              <p>PDF yang Anda unggah akan dipantau dari halaman ini.</p>
+              <h3 id="empty-state-title">Belum ada dokumen</h3>
+              <p id="empty-state-copy">PDF yang Anda unggah akan dipantau dari halaman ini.</p>
             </div>
           </div>
         </section>

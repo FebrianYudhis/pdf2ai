@@ -21,10 +21,16 @@ const elements = {
   clearSelection: document.querySelector("#clear-selection"),
   uploadButton: document.querySelector("#upload-button"),
   uploadButtonLabel: document.querySelector("#upload-button-label"),
+  uploadFolder: document.querySelector("#upload-folder"),
   refreshButton: document.querySelector("#refresh-button"),
   lastUpdated: document.querySelector("#last-updated"),
+  folderFilterList: document.querySelector("#folder-filter-list"),
+  createFolderButton: document.querySelector("#create-folder-button"),
+  manageFolderButton: document.querySelector("#manage-folder-button"),
   jobList: document.querySelector("#job-list"),
   emptyState: document.querySelector("#empty-state"),
+  emptyStateTitle: document.querySelector("#empty-state-title"),
+  emptyStateCopy: document.querySelector("#empty-state-copy"),
   dialog: document.querySelector("#markdown-dialog"),
   dialogTitle: document.querySelector("#dialog-title"),
   closeDialog: document.querySelector("#close-dialog"),
@@ -161,6 +167,8 @@ let uploading = false;
 let refreshTimer;
 let apiKeyConfigured = false;
 let latestJobs = [];
+let virtualFolders = [];
+let activeFolderFilter = "all";
 let importedAiModels = [];
 let importedAiBaseUrl = "";
 let currentAiJob = null;
@@ -304,14 +312,261 @@ function actionButton(label, className, handler, title = label) {
   return button;
 }
 
+function currentFolder() {
+  return virtualFolders.find((folder) => folder.id === activeFolderFilter) ?? null;
+}
+
+function updateFolderFilterState() {
+  for (const button of elements.folderFilterList.querySelectorAll("[data-folder-filter]")) {
+    const active = button.dataset.folderFilter === activeFolderFilter;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-current", active ? "true" : "false");
+  }
+  elements.manageFolderButton.hidden = !currentFolder();
+}
+
+function setFolderFilter(filter) {
+  activeFolderFilter = filter;
+  updateFolderFilterState();
+  renderJobs(latestJobs);
+}
+
+function folderFilterButton({ id, name, count, kind = "folder" }) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `folder-filter ${kind}`;
+  button.dataset.folderFilter = id;
+  const label = document.createElement("span");
+  label.textContent = name;
+  const total = document.createElement("small");
+  total.textContent = String(count);
+  button.append(label, total);
+  button.addEventListener("click", () => setFolderFilter(id));
+  return button;
+}
+
+function renderFolderControls(collection) {
+  virtualFolders = collection.folders;
+  if (
+    activeFolderFilter !== "all" &&
+    activeFolderFilter !== "unfiled" &&
+    !virtualFolders.some((folder) => folder.id === activeFolderFilter)
+  ) {
+    activeFolderFilter = "all";
+  }
+
+  elements.folderFilterList.replaceChildren(
+    folderFilterButton({
+      id: "all",
+      name: "Semua dokumen",
+      count: collection.totalJobCount,
+      kind: "all",
+    }),
+    folderFilterButton({
+      id: "unfiled",
+      name: "Tanpa folder",
+      count: collection.unfiledCount,
+      kind: "unfiled",
+    }),
+    ...virtualFolders.map((folder) =>
+      folderFilterButton({
+        id: folder.id,
+        name: folder.name,
+        count: folder.jobCount,
+      }),
+    ),
+  );
+  updateFolderFilterState();
+
+  const selectedUploadFolder = elements.uploadFolder.value;
+  elements.uploadFolder.replaceChildren(
+    new Option("Tanpa folder", ""),
+    ...virtualFolders.map((folder) => new Option(folder.name, folder.id)),
+  );
+  elements.uploadFolder.value = virtualFolders.some(
+    (folder) => folder.id === selectedUploadFolder,
+  )
+    ? selectedUploadFolder
+    : "";
+}
+
+function visibleJobs(jobs) {
+  if (activeFolderFilter === "all") {
+    return jobs;
+  }
+  if (activeFolderFilter === "unfiled") {
+    return jobs.filter((job) => !job.folderId);
+  }
+  return jobs.filter((job) => job.folderId === activeFolderFilter);
+}
+
+async function createVirtualFolder() {
+  const result = await Swal.fire({
+    target: document.body,
+    title: "Buat folder baru",
+    text: "Folder hanya mengelompokkan dokumen secara virtual.",
+    input: "text",
+    inputPlaceholder: "Contoh: Invoice 2026",
+    inputAttributes: { maxlength: "80", autocapitalize: "sentences" },
+    showCancelButton: true,
+    confirmButtonText: "Buat folder",
+    cancelButtonText: "Batal",
+    confirmButtonColor: "#3b82f6",
+    cancelButtonColor: "#64748b",
+    customClass: { popup: "pdf2ai-swal-popup", title: "pdf2ai-swal-title" },
+  });
+  if (!result.isConfirmed) {
+    return;
+  }
+  const name = String(result.value ?? "").trim();
+  if (!name) {
+    showToast("Nama folder tidak boleh kosong.", "error");
+    return;
+  }
+  try {
+    const response = await api("/v1/folders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const { folder } = await response.json();
+    activeFolderFilter = folder.id;
+    await refreshJobs({ quiet: true });
+    elements.uploadFolder.value = folder.id;
+    showToast(`Folder “${folder.name}” berhasil dibuat.`);
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+}
+
+async function manageCurrentFolder() {
+  const folder = currentFolder();
+  if (!folder) {
+    return;
+  }
+  const choice = await Swal.fire({
+    target: document.body,
+    title: folder.name,
+    text: `${folder.jobCount} dokumen berada di folder ini.`,
+    icon: "info",
+    showCancelButton: true,
+    showDenyButton: true,
+    confirmButtonText: "Ubah nama",
+    denyButtonText: "Hapus folder",
+    cancelButtonText: "Batal",
+    confirmButtonColor: "#3b82f6",
+    denyButtonColor: "#ef4444",
+    cancelButtonColor: "#64748b",
+    customClass: { popup: "pdf2ai-swal-popup", title: "pdf2ai-swal-title" },
+  });
+
+  if (choice.isConfirmed) {
+    const renamed = await Swal.fire({
+      target: document.body,
+      title: "Ubah nama folder",
+      input: "text",
+      inputValue: folder.name,
+      inputAttributes: { maxlength: "80" },
+      showCancelButton: true,
+      confirmButtonText: "Simpan nama",
+      cancelButtonText: "Batal",
+      customClass: { popup: "pdf2ai-swal-popup", title: "pdf2ai-swal-title" },
+    });
+    const name = String(renamed.value ?? "").trim();
+    if (!renamed.isConfirmed || !name || name === folder.name) {
+      return;
+    }
+    try {
+      await api(`/v1/folders/${encodeURIComponent(folder.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      await refreshJobs({ quiet: true });
+      showToast("Nama folder berhasil diperbarui.");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+    return;
+  }
+
+  if (!choice.isDenied) {
+    return;
+  }
+  const confirmed = await confirmDeletion({
+    title: `Hapus folder “${folder.name}”?`,
+    text: "PDF tidak ikut dihapus dan akan dipindahkan ke Tanpa folder.",
+    confirmButtonText: "Hapus folder",
+  });
+  if (!confirmed) {
+    return;
+  }
+  try {
+    await api(`/v1/folders/${encodeURIComponent(folder.id)}`, {
+      method: "DELETE",
+    });
+    activeFolderFilter = "unfiled";
+    await refreshJobs({ quiet: true });
+    showToast("Folder dihapus. Dokumen tetap aman di Tanpa folder.");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+}
+
+async function moveJobToFolder(job) {
+  const inputOptions = { __unfiled__: "Tanpa folder" };
+  for (const folder of virtualFolders) {
+    inputOptions[folder.id] = folder.name;
+  }
+  const result = await Swal.fire({
+    target: document.body,
+    title: "Pindahkan dokumen",
+    text: job.originalName,
+    input: "select",
+    inputOptions,
+    inputValue: job.folderId ?? "__unfiled__",
+    showCancelButton: true,
+    confirmButtonText: "Pindahkan",
+    cancelButtonText: "Batal",
+    customClass: { popup: "pdf2ai-swal-popup", title: "pdf2ai-swal-title" },
+  });
+  if (!result.isConfirmed) {
+    return;
+  }
+  const folderId = result.value === "__unfiled__" ? null : result.value;
+  if (folderId === (job.folderId ?? null)) {
+    return;
+  }
+  try {
+    await api(`/v1/jobs/${encodeURIComponent(job.id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ folderId }),
+    });
+    await refreshJobs({ quiet: true });
+    showToast("Dokumen berhasil dipindahkan.");
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+}
+
 function renderJobs(jobs) {
   latestJobs = jobs;
-  if (jobs.length === 0) {
+  const filteredJobs = visibleJobs(jobs);
+  if (filteredJobs.length === 0) {
+    const folder = currentFolder();
+    elements.emptyStateTitle.textContent =
+      activeFolderFilter === "all" ? "Belum ada dokumen" : "Folder masih kosong";
+    elements.emptyStateCopy.textContent = folder
+      ? `Pilih folder “${folder.name}” saat upload atau pindahkan dokumen ke sini.`
+      : activeFolderFilter === "unfiled"
+        ? "Semua dokumen saat ini sudah dikelompokkan ke dalam folder."
+        : "PDF yang Anda unggah akan dipantau dari halaman ini.";
     elements.jobList.replaceChildren(elements.emptyState);
     return;
   }
 
-  const rows = jobs.map((job) => {
+  const rows = filteredJobs.map((job) => {
     const row = document.createElement("article");
     row.className = "job-row";
 
@@ -328,7 +583,17 @@ function renderJobs(jobs) {
     name.title = job.originalName;
     const meta = document.createElement("small");
     meta.textContent = `${formatBytes(job.size)} · ${formatTime(job.createdAt)}`;
-    details.append(name, meta);
+    const metaRow = document.createElement("div");
+    metaRow.className = "file-meta-row";
+    metaRow.append(meta);
+    if (job.folder) {
+      const folderBadge = document.createElement("span");
+      folderBadge.className = "file-folder-badge";
+      folderBadge.textContent = job.folder.name;
+      folderBadge.title = `Folder: ${job.folder.name}`;
+      metaRow.append(folderBadge);
+    }
+    details.append(name, metaRow);
     if (job.status === "processing") {
       const progress = document.createElement("span");
       progress.className = "progress-track";
@@ -360,6 +625,14 @@ function renderJobs(jobs) {
 
     const actions = document.createElement("div");
     actions.className = "job-actions";
+    actions.append(
+      actionButton(
+        "Pindah",
+        "small-action folder",
+        () => moveJobToFolder(job),
+        "Pindahkan dokumen ke folder virtual",
+      ),
+    );
     if (job.status === "completed") {
       if (aiConfig.configured) {
         actions.append(
@@ -415,8 +688,15 @@ async function refreshJobs({ quiet = false } = {}) {
     elements.refreshButton.classList.add("loading");
   }
   try {
-    const response = await api("/v1/jobs");
-    const body = await response.json();
+    const [jobsResponse, foldersResponse] = await Promise.all([
+      api("/v1/jobs"),
+      api("/v1/folders"),
+    ]);
+    const [body, foldersBody] = await Promise.all([
+      jobsResponse.json(),
+      foldersResponse.json(),
+    ]);
+    renderFolderControls(foldersBody);
     renderJobs(body.jobs);
     updateStats(body.stats);
     elements.lastUpdated.textContent = `Diperbarui pukul ${new Intl.DateTimeFormat(
@@ -1114,6 +1394,9 @@ async function uploadSelected() {
     elements.uploadButtonLabel.textContent =
       `Mengunggah ${completed + 1} dari ${files.length}…`;
     const form = new FormData();
+    if (elements.uploadFolder.value) {
+      form.append("folderId", elements.uploadFolder.value);
+    }
     form.append("file", file, file.name);
     try {
       await api("/v1/jobs", { method: "POST", body: form });
@@ -1321,6 +1604,8 @@ elements.clearSelection.addEventListener("click", () => {
 
 elements.uploadButton.addEventListener("click", uploadSelected);
 elements.refreshButton.addEventListener("click", () => refreshJobs());
+elements.createFolderButton.addEventListener("click", createVirtualFolder);
+elements.manageFolderButton.addEventListener("click", manageCurrentFolder);
 elements.configButton.addEventListener("click", () => openConfiguration("app"));
 elements.closeConfigDialog.addEventListener("click", closeConfiguration);
 elements.configDialog.addEventListener("click", (event) => {
