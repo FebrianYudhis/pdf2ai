@@ -20,8 +20,10 @@ Parser dokumen menggunakan
 - Copy link API untuk metadata, PDF, Markdown, dan penghapusan.
 - Unduh PDF atau Markdown langsung dari dashboard.
 - Hapus job beserta PDF, metadata, dan Markdown.
-- API asynchronous dan endpoint synchronous untuk integrasi sederhana.
+- Job API asynchronous untuk integrasi aplikasi lain.
 - Dashboard responsif dengan tema terang dan gelap otomatis.
+- Login hanya dengan kode TOTP dari aplikasi authenticator standar.
+- API key yang dapat dibuat, dirotasi, dan dicabut oleh pengguna yang login.
 
 ## Quick Start
 
@@ -72,6 +74,13 @@ http://127.0.0.1:3000
 Launcher akan menyalakan backend OCR pada port `5002` jika diperlukan, menunggu
 hingga OCR siap, lalu menjalankan dashboard dan API pada port `3000`. Gunakan
 `Ctrl+C` untuk menghentikan seluruh proses yang dikelola launcher.
+Pada penggunaan pertama, browser akan membuka halaman konfigurasi TOTP:
+
+1. Tampilkan lalu pindai QR menggunakan aplikasi authenticator.
+2. Masukkan kode 6 digit untuk mengaktifkan TOTP.
+
+Konfigurasi ini hanya dilakukan sekali. Login berikutnya selalu memerlukan
+kode TOTP 6 digit tanpa password.
 
 ## Menggunakan dashboard
 
@@ -82,9 +91,12 @@ hingga OCR siap, lalu menjalankan dashboard dan API pada port `3000`. Gunakan
    - PDF asli;
    - metadata job;
    - hasil Markdown.
-5. Klik **Fetch Data** untuk melihat ID surat, URL API, contoh JavaScript, dan
+5. Klik **API Key** untuk membuat atau merotasi key akses client eksternal.
+6. Buka **API Docs** untuk panduan endpoint, autentikasi, response, dan contoh
+   kode yang mengikuti alamat server aktif.
+7. Klik **Fetch Data** untuk melihat ID surat, URL API, contoh JavaScript, dan
    cara menghapus data melalui API.
-6. Gunakan tombol **Hapus** untuk menghapus data secara permanen.
+8. Gunakan tombol **Hapus** untuk menghapus data secara permanen.
 
 Browser boleh ditutup setelah upload selesai. Job akan terus diproses oleh
 server dan dimuat kembali ketika aplikasi dimulai ulang.
@@ -120,6 +132,22 @@ Base URL default:
 http://127.0.0.1:3000
 ```
 
+Dokumentasi interaktif tersedia di `/docs` setelah login TOTP. Halaman tersebut
+menyediakan navigasi semua endpoint, contoh response, status error, serta tombol
+salin untuk contoh cURL dan JavaScript.
+
+TOTP melindungi dashboard web. Setelah login, buka **API Key** di bagian atas
+dashboard untuk membuat key. Key lengkap hanya ditampilkan sekali; membuat key
+baru otomatis menonaktifkan key lama.
+
+Client eksternal harus mengirim key melalui header:
+
+```http
+X-API-Key: <API_KEY>
+```
+
+Endpoint `/health` tetap tersedia tanpa autentikasi untuk health check.
+
 ### Ringkasan endpoint
 
 | Method | Endpoint | Response |
@@ -131,7 +159,6 @@ http://127.0.0.1:3000
 | `GET` | `/v1/jobs/:id/pdf` | PDF asli |
 | `GET` | `/v1/jobs/:id/markdown` | Markdown hasil ekstraksi |
 | `DELETE` | `/v1/jobs/:id` | Menghapus job dan seluruh file |
-| `POST` | `/v1/extract/markdown` | Ekstraksi synchronous ke Markdown |
 
 ### Upload PDF
 
@@ -139,6 +166,7 @@ Kirim tepat satu PDF melalui multipart field bernama `file`:
 
 ```bash
 curl -F "file=@document.pdf;type=application/pdf" \
+  -H "X-API-Key: $PDF2AI_API_KEY" \
   http://127.0.0.1:3000/v1/jobs
 ```
 
@@ -170,7 +198,8 @@ Content-Type: application/json
 ### Periksa status
 
 ```bash
-curl http://127.0.0.1:3000/v1/jobs/JOB_ID
+curl -H "X-API-Key: $PDF2AI_API_KEY" \
+  http://127.0.0.1:3000/v1/jobs/JOB_ID
 ```
 
 | Status | Arti |
@@ -186,6 +215,7 @@ curl http://127.0.0.1:3000/v1/jobs/JOB_ID
 
 ```bash
 curl http://127.0.0.1:3000/v1/jobs/JOB_ID/pdf \
+  -H "X-API-Key: $PDF2AI_API_KEY" \
   --output document.pdf
 ```
 
@@ -199,6 +229,7 @@ GET /v1/jobs/:id/pdf?download=1
 
 ```bash
 curl http://127.0.0.1:3000/v1/jobs/JOB_ID/markdown \
+  -H "X-API-Key: $PDF2AI_API_KEY" \
   --output result.md
 ```
 
@@ -214,7 +245,9 @@ GET /v1/jobs/:id/markdown?download=1
 ### Hapus data
 
 ```bash
-curl -X DELETE http://127.0.0.1:3000/v1/jobs/JOB_ID
+curl -X DELETE \
+  -H "X-API-Key: $PDF2AI_API_KEY" \
+  http://127.0.0.1:3000/v1/jobs/JOB_ID
 ```
 
 Hanya job `completed` atau `failed` yang dapat dihapus. Penghapusan menghapus
@@ -224,9 +257,12 @@ PDF sumber, metadata, dan Markdown secara permanen.
 
 ```javascript
 const baseUrl = "http://127.0.0.1:3000";
+const auth = { "X-API-Key": process.env.PDF2AI_API_KEY };
 
 async function ambilSurat(id) {
-  const statusResponse = await fetch(`${baseUrl}/v1/jobs/${id}`);
+  const statusResponse = await fetch(`${baseUrl}/v1/jobs/${id}`, {
+    headers: auth,
+  });
   if (!statusResponse.ok) {
     throw new Error(`Surat tidak ditemukan (${statusResponse.status})`);
   }
@@ -237,8 +273,8 @@ async function ambilSurat(id) {
   }
 
   const [pdfResponse, markdownResponse] = await Promise.all([
-    fetch(`${baseUrl}${job.pdfUrl}`),
-    fetch(`${baseUrl}${job.markdownUrl}`),
+    fetch(`${baseUrl}${job.pdfUrl}`, { headers: auth }),
+    fetch(`${baseUrl}${job.markdownUrl}`, { headers: auth }),
   ]);
 
   if (!pdfResponse.ok || !markdownResponse.ok) {
@@ -256,6 +292,7 @@ async function ambilSurat(id) {
 async function hapusSurat(id) {
   const response = await fetch(`${baseUrl}/v1/jobs/${id}`, {
     method: "DELETE",
+    headers: auth,
   });
 
   if (!response.ok) {
@@ -268,21 +305,14 @@ Untuk JavaScript yang berjalan pada origin berbeda, browser memerlukan
 konfigurasi CORS. Client backend-to-backend tidak terpengaruh aturan CORS
 browser.
 
-### Endpoint synchronous
-
-```http
-POST /v1/extract/markdown
-Content-Type: multipart/form-data
-```
-
-Endpoint ini menunggu ekstraksi selesai dan mengembalikan body
-`text/markdown`. Job sementara otomatis dihapus setelah response selesai.
-Gunakan Job API untuk dokumen besar atau proses OCR yang lama.
-
 ## Konfigurasi
 
 | Variable | Default | Keterangan |
 | --- | --- | --- |
+| `APP_SESSION_HOURS` | `12` | Durasi sesi login browser dalam jam |
+| `APP_AUTH_FILE` | `data/auth.json` | Lokasi konfigurasi rahasia TOTP |
+| `APP_TOTP_ISSUER` | `PDF2AI` | Nama aplikasi di authenticator |
+| `APP_TOTP_ACCOUNT` | `Dashboard` | Nama akun di authenticator |
 | `HOST` | `127.0.0.1` | Host dashboard dan API |
 | `PORT` | `3000` | Port dashboard dan API |
 | `ODL_DATA_DIR` | `data/jobs` | Direktori penyimpanan job |
@@ -354,6 +384,9 @@ server berhenti akan dikembalikan menjadi `queued` saat startup berikutnya.
 .
 ├── public/
 │   ├── app.js
+│   ├── docs.html
+│   ├── docs.js
+│   ├── fonts/
 │   ├── index.html
 │   └── styles.css
 ├── scripts/
@@ -411,10 +444,28 @@ curl http://127.0.0.1:5002/health
 
 - Konfigurasi default hanya menerima koneksi dari mesin yang menjalankan
   aplikasi.
-- Belum tersedia autentikasi, otorisasi per pengguna, rate limit, atau HTTPS.
-- Tambahkan autentikasi, HTTPS, rate limit, dan kebijakan CORS sebelum
-  menggunakannya sebagai service bersama atau production.
+- Dashboard web dilindungi kode TOTP. Percobaan kode yang gagal dibatasi lima
+  kali per alamat IP dalam lima menit.
+- Endpoint `/v1/*` memerlukan header `X-API-Key`. Dashboard yang sudah login
+  tetap dapat memakai endpoint tersebut melalui cookie sesi.
+- API key dibuat dari bilangan acak kriptografis dan hanya hash SHA-256-nya
+  yang disimpan. Key lengkap hanya ditampilkan saat dibuat atau dirotasi.
+- Secret TOTP disimpan lokal di `data/auth.json` dengan mode `0600` pada sistem
+  yang mendukung permission POSIX. Jangan membagikan file ini atau key manual
+  yang ditampilkan saat setup.
+- Cookie sesi menggunakan `HttpOnly` dan `SameSite=Strict`; atribut `Secure`
+  aktif ketika aplikasi diakses melalui HTTPS.
+- Setup pertama tidak memiliki password pelindung. Selesaikan enrollment saat
+  aplikasi masih hanya dapat diakses dari `127.0.0.1`, lalu gunakan HTTPS
+  sebelum membuka service ke jaringan atau production.
 - Dokumen sensitif sebaiknya diproses pada lingkungan yang tepercaya.
+- Font antarmuka disimpan di `public/fonts/`; browser tidak perlu mengambil font
+  dari CDN eksternal.
+
+Jika perangkat authenticator hilang, hentikan aplikasi, hapus
+`data/auth.json`, lalu jalankan aplikasi kembali untuk melakukan enrollment
+ulang. Tindakan pemulihan ini memerlukan akses langsung ke mesin server dan
+akan membuka kembali halaman setup TOTP.
 
 ## Changelog
 

@@ -4,6 +4,56 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) dan versi mengikuti
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-08-01
+
+### Added
+
+- Enrollment TOTP satu kali melalui QR code yang kompatibel dengan aplikasi
+  authenticator standar.
+- Halaman login TOTP tanpa ketergantungan pada `APP_PASSWORD`.
+- Sesi dashboard dengan cookie `HttpOnly` dan `SameSite=Strict`, tombol keluar,
+  serta masa berlaku sesi yang dapat dikonfigurasi.
+- Pengelolaan satu API key aktif dari dashboard setelah login TOTP, termasuk
+  pembuatan, penyalinan, rotasi, dan pencabutan.
+- Endpoint manajemen API key berbasis sesi:
+  - `GET /auth/api-key`
+  - `POST /auth/api-key`
+  - `DELETE /auth/api-key`
+- Konfigurasi TOTP dan metadata API key persisten di `data/auth.json`.
+- Dukungan header `X-API-Key` untuk client eksternal yang mengakses `/v1/*`.
+- Halaman khusus `/docs` setelah login TOTP, berisi quick start, referensi semua
+  endpoint, model data, status error, dan contoh cURL/JavaScript yang dapat disalin.
+- Automated test untuk enrollment TOTP, login, logout, persistensi, API key
+  salah/valid, rotasi, pencabutan, dan pemulihan setelah restart.
+
+### Changed
+
+- Endpoint `/v1/*` kini menerima cookie sesi dashboard atau API key yang valid.
+- Contoh Fetch API dan `curl` kini menyertakan header `X-API-Key`.
+- Dashboard memiliki dialog khusus untuk melihat status dan mengelola API key.
+- Endpoint `/health` tetap publik untuk kebutuhan health check.
+- Cabinet Grotesk dan Inter kini disajikan dari aset lokal tanpa request font ke
+  CDN eksternal.
+
+### Removed
+
+- Endpoint synchronous `POST /v1/extract/markdown`; ekstraksi kini hanya melalui
+  job asynchronous agar client selalu membuat job, memantau status, lalu mengambil
+  hasil Markdown.
+
+### Security
+
+- API key dibuat dari bilangan acak kriptografis 256-bit dan hanya ditampilkan
+  satu kali kepada pengguna.
+- Server hanya menyimpan hash SHA-256 dan prefix API key, bukan key asli.
+- Perbandingan hash API key menggunakan operasi constant-time.
+- Rotasi langsung menonaktifkan key sebelumnya dan pencabutan menghapus akses
+  client eksternal.
+- Login dan konfirmasi enrollment dibatasi lima percobaan gagal per alamat IP
+  dalam lima menit.
+- Secret TOTP ditulis dengan mode file `0600` pada sistem yang mendukung
+  permission POSIX.
+
 ## [1.0.0] - 2026-07-30
 
 Rilis awal **PDF2AI — PDF to AI Ready**.

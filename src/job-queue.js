@@ -57,7 +57,6 @@ export class JobQueue {
     this.logger = logger;
     this.jobs = new Map();
     this.pending = [];
-    this.waiters = new Map();
     this.processing = false;
     this.idleWaiters = [];
   }
@@ -181,22 +180,6 @@ export class JobQueue {
     return createReadStream(join(this.#jobDirectory(id), "input.pdf"));
   }
 
-  async waitForCompletion(id) {
-    const job = this.#require(id);
-    if (job.status === "completed") {
-      return publicJob(job);
-    }
-    if (job.status === "failed") {
-      throw new JobError(500, job.error || "Ekstraksi PDF gagal.");
-    }
-
-    return new Promise((resolvePromise, rejectPromise) => {
-      const listeners = this.waiters.get(id) ?? [];
-      listeners.push({ resolve: resolvePromise, reject: rejectPromise });
-      this.waiters.set(id, listeners);
-    });
-  }
-
   async delete(id) {
     const job = this.#require(id);
     if (!TERMINAL_STATUSES.has(job.status)) {
@@ -296,7 +279,6 @@ export class JobQueue {
           job.status = "completed";
           job.completedAt = new Date().toISOString();
           await this.#persist(job);
-          this.#settle(id, null, publicJob(job));
         } catch (error) {
           job.status = "failed";
           job.completedAt = new Date().toISOString();
@@ -305,11 +287,6 @@ export class JobQueue {
           this.logger.error?.(
             { err: error, jobId: id },
             "Ekstraksi PDF gagal",
-          );
-          this.#settle(
-            id,
-            new JobError(500, job.error),
-            publicJob(job),
           );
         }
       }
@@ -323,15 +300,4 @@ export class JobQueue {
     }
   }
 
-  #settle(id, error, job) {
-    const listeners = this.waiters.get(id) ?? [];
-    this.waiters.delete(id);
-    for (const listener of listeners) {
-      if (error) {
-        listener.reject(error);
-      } else {
-        listener.resolve(job);
-      }
-    }
-  }
 }

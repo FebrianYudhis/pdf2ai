@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Dokumentasi HTTP API PDF2AI untuk upload, memantau, dan mengambil hasil ekstraksi PDF."
+    />
+    <title>API Docs — PDF2AI</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="/docs.js" type="module"></script>
+  </head>
+  <body class="docs-page">
+    <a class="skip-link" href="#docs-content">Lewati ke dokumentasi</a>
+
+    <header class="topbar">
+      <div class="topbar-inner docs-topbar-inner">
+        <a class="brand" href="/" aria-label="PDF2AI Dashboard">
+          <span class="brand-mark" aria-hidden="true">P2</span>
+          <span class="brand-copy">
+            <strong>PDF2AI</strong>
+            <small>API Documentation</small>
+          </span>
+        </a>
+
+        <div class="topbar-actions">
+          <span class="docs-version">API v1</span>
+          <a class="logout-button" href="/">← Dashboard</a>
+        </div>
+      </div>
+    </header>
+
+    <main class="docs-layout">
+      <aside class="docs-sidebar" aria-label="Navigasi dokumentasi">
+        <p class="docs-sidebar-label">MULAI</p>
+        <nav>
+          <a href="#overview">Ringkasan</a>
+          <a href="#quickstart">Quick start</a>
+          <a href="#authentication">Autentikasi</a>
+        </nav>
+
+        <p class="docs-sidebar-label">ENDPOINT</p>
+        <nav>
+          <a href="#health"><span class="nav-method get">GET</span> Health</a>
+          <a href="#create-job"><span class="nav-method post">POST</span> Buat job</a>
+          <a href="#list-jobs"><span class="nav-method get">GET</span> Daftar job</a>
+          <a href="#job-status"><span class="nav-method get">GET</span> Status job</a>
+          <a href="#job-files"><span class="nav-method get">GET</span> Ambil hasil</a>
+          <a href="#delete-job"><span class="nav-method delete">DEL</span> Hapus job</a>
+        </nav>
+
+        <p class="docs-sidebar-label">REFERENSI</p>
+        <nav>
+          <a href="#job-model">Model job</a>
+          <a href="#errors">Error &amp; status</a>
+        </nav>
+      </aside>
+
+      <article class="docs-content" id="docs-content">
+        <section class="docs-hero" id="overview">
+          <div class="docs-hero-copy">
+            <p class="eyebrow">HTTP API · VERSION 1</p>
+            <h1>Integrasikan PDF2AI.</h1>
+            <p>
+              Upload PDF, pantau proses OCR, lalu ambil PDF asli dan Markdown
+              terstruktur dari aplikasi Anda sendiri.
+            </p>
+          </div>
+
+          <div class="base-url-card">
+            <div>
+              <span>BASE URL AKTIF</span>
+              <code data-api-base>{{BASE_URL}}</code>
+            </div>
+            <button
+              class="endpoint-copy-button"
+              type="button"
+              data-copy-base
+              aria-label="Salin base URL"
+            >
+              Salin
+            </button>
+          </div>
+
+          <div class="docs-callout info-callout">
+            <strong>Perlu login TOTP.</strong>
+            <p>
+              Halaman dokumentasi ini hanya dapat dibuka setelah login. Client
+              eksternal memakai API key untuk mengakses endpoint <code>/v1/*</code>.
+            </p>
+          </div>
+        </section>
+
+        <section class="docs-section" id="quickstart">
+          <div class="docs-section-heading">
+            <span class="docs-step">01</span>
+            <div>
+              <p class="eyebrow">QUICK START</p>
+              <h2>Dari PDF ke Markdown</h2>
+              <p>Alur asynchronous direkomendasikan untuk OCR dan dokumen besar.</p>
+            </div>
+          </div>
+
+          <ol class="flow-steps">
+            <li>
+              <span>1</span>
+              <div><strong>Buat API key</strong><small>Dari dashboard setelah login TOTP.</small></div>
+            </li>
+            <li>
+              <span>2</span>
+              <div><strong>Upload PDF</strong><small>Simpan ID job dari response.</small></div>
+            </li>
+            <li>
+              <span>3</span>
+              <div><strong>Periksa status</strong><small>Tunggu sampai <code>completed</code>.</small></div>
+            </li>
+            <li>
+              <span>4</span>
+              <div><strong>Ambil hasil</strong><small>Unduh PDF dan Markdown.</small></div>
+            </li>
+          </ol>
+
+          <div class="code-sample docs-code-sample">
+            <div class="code-sample-header">
+              <span>Shell · Alur lengkap</span>
+              <button class="code-copy-button" type="button" data-copy="#quickstart-code">
+                Salin kode
+              </button>
+            </div>
+            <pre id="quickstart-code" data-code tabindex="0">export PDF2AI_API_KEY="p2ai_..."
+
+# 1. Upload PDF dan salin job.id dari response
+curl -F "file=@document.pdf;type=application/pdf" \
+  -H "X-API-Key: $PDF2AI_API_KEY" \
+  {{BASE_URL}}/v1/jobs
+
+# 2. Periksa status job
+curl -H "X-API-Key: $PDF2AI_API_KEY" \
+  {{BASE_URL}}/v1/jobs/JOB_ID
+
+# 3. Ambil Markdown setelah status completed
+curl -H "X-API-Key: $PDF2AI_API_KEY" \
+  {{BASE_URL}}/v1/jobs/JOB_ID/markdown</pre>
+          </div>
+        </section>
+
+        <section class="docs-section" id="authentication">
+          <div class="docs-section-heading compact">
+            <span class="docs-step">02</span>
+            <div>
+              <p class="eyebrow">AUTENTIKASI</p>
+              <h2>Gunakan X-API-Key</h2>
+            </div>
+          </div>
+
+          <div class="docs-prose">
+            <p>
+              Login ke dashboard dengan TOTP, klik <strong>API Key</strong>, lalu
+              pilih <strong>Buat API key</strong>. Key lengkap hanya ditampilkan
+              sekali. Membuat key baru langsung menonaktifkan key lama.
+            </p>
+          </div>
+
+          <div class="auth-header-card">
+            <span>REQUEST HEADER</span>
+            <code>X-API-Key: p2ai_...</code>
+          </div>
+
+          <div class="docs-callout warning-callout">
+            <strong>Jangan taruh API key di frontend publik.</strong>
+            <p>
+              Simpan sebagai secret atau environment variable pada backend Anda.
+              Endpoint <code>/health</code> adalah satu-satunya endpoint API yang
+              tidak memerlukan key.
+            </p>
+          </div>
+        </section>
+
+        <section class="docs-section endpoint-section" id="health">
+          <div class="endpoint-title">
+            <span class="method-badge get">GET</span>
+            <code>/health</code>
+            <span class="auth-badge public">PUBLIK</span>
+          </div>
+          <p>Memeriksa kesiapan API, backend OCR, dan statistik antrean.</p>
+
+          <div class="code-sample docs-code-sample">
+            <div class="code-sample-header">
+              <span>cURL</span>
+              <button class="code-copy-button" type="button" data-copy="#health-code">Salin</button>
+            </div>
+            <pre id="health-code" data-code tabindex="0">curl {{BASE_URL}}/health</pre>
+          </div>
+
+          <details class="response-details">
+            <summary>Contoh response · 200 OK</summary>
+            <pre>{
+  "status": "ok",
+  "mode": "hybrid",
+  "hybridReady": true,
+  "queue": {
+    "queued": 0,
+    "processing": 1,
+    "completed": 8,
+    "failed": 0
+  }
+}</pre>
+          </details>
+        </section>
+
+        <section class="docs-section endpoint-section" id="create-job">
+          <div class="endpoint-title">
+            <span class="method-badge post">POST</span>
+            <code>/v1/jobs</code>
+            <span class="auth-badge">API KEY</span>
+          </div>
+          <p>
+            Membuat job background. Kirim tepat satu PDF melalui multipart field
+            bernama <code>file</code>. Batas default adalah 25 MB.
+          </p>
+
+          <div class="parameter-table-wrap">
+            <table class="parameter-table">
+              <thead><tr><th>Field</th><th>Tipe</th><th>Wajib</th><th>Keterangan</th></tr></thead>
+              <tbody>
+                <tr><td><code>file</code></td><td>PDF binary</td><td>Ya</td><td>File dengan signature PDF yang valid.</td></tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="code-tabs-grid">
+            <div class="code-sample docs-code-sample">
+              <div class="code-sample-header">
+                <span>cURL</span>
+                <button class="code-copy-button" type="button" data-copy="#create-curl">Salin</button>
+              </div>
+              <pre id="create-curl" data-code tabindex="0">curl -F "file=@document.pdf;type=application/pdf" \
+  -H "X-API-Key: $PDF2AI_API_KEY" \
+  {{BASE_URL}}/v1/jobs</pre>
+            </div>
+
+            <div class="code-sample docs-code-sample">
+              <div class="code-sample-header">
+                <span>JavaScript · Node.js</span>
+                <button class="code-copy-button" type="button" data-copy="#create-js">Salin</button>
+              </div>
+              <pre id="create-js" data-code tabindex="0">const form = new FormData();
+form.set("file", new Blob([pdfBuffer], {
+  type: "application/pdf",
+}), "document.pdf");
+
+const response = await fetch("{{BASE_URL}}/v1/jobs", {
+  method: "POST",
+  headers: { "X-API-Key": process.env.PDF2AI_API_KEY },
+  body: form,
+});
+
+const { job } = await response.json();</pre>
+            </div>
+          </div>
+
+          <details class="response-details" open>
+            <summary>Contoh response · 202 Accepted</summary>
+            <pre>{
+  "job": {
+    "id": "2a6cf34e-7c27-4ba8-afcc-8c91339e3f0c",
+    "originalName": "document.pdf",
+    "size": 1048576,
+    "status": "queued",
+    "createdAt": "2026-08-01T08:00:00.000Z",
+    "startedAt": null,
+    "completedAt": null,
+    "jobUrl": "/v1/jobs/2a6cf34e-7c27-4ba8-afcc-8c91339e3f0c",
+    "pdfUrl": "/v1/jobs/2a6cf34e-7c27-4ba8-afcc-8c91339e3f0c/pdf",
+    "markdownUrl": null
+  }
+}</pre>
+          </details>
+          <p class="response-note">
+            Header <code>Location</code> berisi URL status job yang baru dibuat.
+          </p>
+        </section>
+
+        <section class="docs-section endpoint-section" id="list-jobs">
+          <div class="endpoint-title">
+            <span class="method-badge get">GET</span>
+            <code>/v1/jobs</code>
+            <span class="auth-badge">API KEY</span>
+          </div>
+          <p>Mengambil seluruh job, urutan terbaru, dan ringkasan antrean.</p>
+
+          <div class="code-sample docs-code-sample">
+            <div class="code-sample-header">
+              <span>cURL</span>
+              <button class="code-copy-button" type="button" data-copy="#list-code">Salin</button>
+            </div>
+            <pre id="list-code" data-code tabindex="0">curl -H "X-API-Key: $PDF2AI_API_KEY" \
+  {{BASE_URL}}/v1/jobs</pre>
+          </div>
+
+          <details class="response-details">
+            <summary>Bentuk response · 200 OK</summary>
+            <pre>{
+  "jobs": [/* kumpulan object job */],
+  "stats": {
+    "queued": 0,
+    "processing": 0,
+    "completed": 8,
+    "failed": 1
+  }
+}</pre>
+          </details>
+        </section>
+
+        <section class="docs-section endpoint-section" id="job-status">
+          <div class="endpoint-title">
+            <span class="method-badge get">GET</span>
+            <code>/v1/jobs/:id</code>
+            <span class="auth-badge">API KEY</span>
+          </div>
+          <p>
+            Mengambil metadata dan status job. Poll endpoint ini sampai status
+            menjadi <code>completed</code> atau <code>failed</code>.
+          </p>
+
+          <div class="code-sample docs-code-sample">
+            <div class="code-sample-header">
+              <span>cURL</span>
+              <button class="code-copy-button" type="button" data-copy="#status-code">Salin</button>
+            </div>
+            <pre id="status-code" data-code tabindex="0">curl -H "X-API-Key: $PDF2AI_API_KEY" \
+  {{BASE_URL}}/v1/jobs/JOB_ID</pre>
+          </div>
+
+          <div class="status-grid" aria-label="Status job">
+            <div><span class="job-state queued"></span><strong>queued</strong><small>Menunggu worker.</small></div>
+            <div><span class="job-state processing"></span><strong>processing</strong><small>Sedang diekstrak.</small></div>
+            <div><span class="job-state completed"></span><strong>completed</strong><small>Hasil tersedia.</small></div>
+            <div><span class="job-state failed"></span><strong>failed</strong><small>Lihat field error.</small></div>
+          </div>
+        </section>
+
+        <section class="docs-section endpoint-section" id="job-files">
+          <div class="endpoint-title stacked-title">
+            <div><span class="method-badge get">GET</span><code>/v1/jobs/:id/pdf</code></div>
+            <div><span class="method-badge get">GET</span><code>/v1/jobs/:id/markdown</code></div>
+            <span class="auth-badge">API KEY</span>
+          </div>
+          <p>
+            Mengambil PDF sumber atau Markdown hasil ekstraksi. Tambahkan
+            <code>?download=1</code> agar response dikirim sebagai attachment.
+          </p>
+
+          <div class="code-sample docs-code-sample">
+            <div class="code-sample-header">
+              <span>cURL · Unduh hasil</span>
+              <button class="code-copy-button" type="button" data-copy="#files-code">Salin</button>
+            </div>
+            <pre id="files-code" data-code tabindex="0">curl -H "X-API-Key: $PDF2AI_API_KEY" \
+  "{{BASE_URL}}/v1/jobs/JOB_ID/pdf?download=1" \
+  --output document.pdf
+
+curl -H "X-API-Key: $PDF2AI_API_KEY" \
+  "{{BASE_URL}}/v1/jobs/JOB_ID/markdown?download=1" \
+  --output result.md</pre>
+          </div>
+
+          <div class="content-type-grid">
+            <div><span>PDF RESPONSE</span><code>application/pdf</code></div>
+            <div><span>MARKDOWN RESPONSE</span><code>text/markdown; charset=utf-8</code></div>
+          </div>
+        </section>
+
+        <section class="docs-section endpoint-section" id="delete-job">
+          <div class="endpoint-title">
+            <span class="method-badge delete">DELETE</span>
+            <code>/v1/jobs/:id</code>
+            <span class="auth-badge">API KEY</span>
+          </div>
+          <p>
+            Menghapus PDF, metadata, dan Markdown secara permanen. Hanya job
+            berstatus <code>completed</code> atau <code>failed</code> yang dapat dihapus.
+          </p>
+
+          <div class="code-sample docs-code-sample">
+            <div class="code-sample-header">
+              <span>cURL</span>
+              <button class="code-copy-button" type="button" data-copy="#delete-code">Salin</button>
+            </div>
+            <pre id="delete-code" data-code tabindex="0">curl -X DELETE \
+  -H "X-API-Key: $PDF2AI_API_KEY" \
+  {{BASE_URL}}/v1/jobs/JOB_ID</pre>
+          </div>
+          <p class="response-note"><strong>204 No Content</strong> jika penghapusan berhasil.</p>
+        </section>
+
+        <section class="docs-section" id="job-model">
+          <div class="docs-section-heading compact">
+            <span class="docs-step">03</span>
+            <div>
+              <p class="eyebrow">DATA MODEL</p>
+              <h2>Object job</h2>
+            </div>
+          </div>
+
+          <div class="parameter-table-wrap">
+            <table class="parameter-table model-table">
+              <thead><tr><th>Field</th><th>Tipe</th><th>Keterangan</th></tr></thead>
+              <tbody>
+                <tr><td><code>id</code></td><td>UUID</td><td>Identifier unik job.</td></tr>
+                <tr><td><code>originalName</code></td><td>string</td><td>Nama file saat upload.</td></tr>
+                <tr><td><code>size</code></td><td>number</td><td>Ukuran PDF dalam byte.</td></tr>
+                <tr><td><code>status</code></td><td>string</td><td><code>queued</code>, <code>processing</code>, <code>completed</code>, atau <code>failed</code>.</td></tr>
+                <tr><td><code>createdAt</code></td><td>ISO 8601</td><td>Waktu job dibuat.</td></tr>
+                <tr><td><code>startedAt</code></td><td>ISO 8601 | null</td><td>Waktu pemrosesan dimulai.</td></tr>
+                <tr><td><code>completedAt</code></td><td>ISO 8601 | null</td><td>Waktu pemrosesan berakhir.</td></tr>
+                <tr><td><code>error</code></td><td>string | null</td><td>Pesan kegagalan jika status <code>failed</code>.</td></tr>
+                <tr><td><code>jobUrl</code></td><td>string</td><td>URL relatif metadata job.</td></tr>
+                <tr><td><code>pdfUrl</code></td><td>string</td><td>URL relatif PDF sumber.</td></tr>
+                <tr><td><code>markdownUrl</code></td><td>string | null</td><td>Tersedia setelah status <code>completed</code>.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="docs-section" id="errors">
+          <div class="docs-section-heading compact">
+            <span class="docs-step">04</span>
+            <div>
+              <p class="eyebrow">ERROR HANDLING</p>
+              <h2>Status HTTP</h2>
+            </div>
+          </div>
+
+          <div class="error-list">
+            <div><strong>400</strong><span><b>Bad Request</b> — field multipart salah atau request tidak valid.</span></div>
+            <div><strong>401</strong><span><b>Unauthorized</b> — API key hilang, salah, dicabut, atau sudah dirotasi.</span></div>
+            <div><strong>404</strong><span><b>Not Found</b> — ID job tidak ditemukan.</span></div>
+            <div><strong>409</strong><span><b>Conflict</b> — hasil belum siap atau status job tidak mengizinkan aksi.</span></div>
+            <div><strong>413</strong><span><b>Payload Too Large</b> — PDF melebihi batas ukuran.</span></div>
+            <div><strong>415</strong><span><b>Unsupported Media Type</b> — request bukan multipart/form-data.</span></div>
+            <div><strong>500</strong><span><b>Internal Server Error</b> — ekstraksi atau proses internal gagal.</span></div>
+            <div><strong>503</strong><span><b>Service Unavailable</b> — health check mendeteksi backend OCR belum siap.</span></div>
+          </div>
+
+          <div class="code-sample docs-code-sample error-shape">
+            <div class="code-sample-header"><span>Bentuk error JSON</span></div>
+            <pre tabindex="0">{
+  "error": "API key tidak valid atau tidak dikirim."
+}</pre>
+          </div>
+        </section>
+
+        <footer class="docs-footer">
+          <div>
+            <strong>PDF2AI API v1</strong>
+            <p>Dokumentasi mengikuti origin aplikasi yang sedang dibuka.</p>
+          </div>
+          <a class="secondary-button" href="#overview">Kembali ke atas ↑</a>
+        </footer>
+      </article>
+    </main>
+
+    <div class="toast-region" id="toast-region" aria-live="polite"></div>
+  </body>
+</html>

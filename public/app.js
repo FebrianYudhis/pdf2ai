@@ -1,6 +1,8 @@
 const elements = {
   serviceStatus: document.querySelector("#service-status"),
   serviceStatusText: document.querySelector("#service-status-text"),
+  apiKeyButton: document.querySelector("#api-key-button"),
+  logoutButton: document.querySelector("#logout-button"),
   counts: {
     queued: document.querySelector("#count-queued"),
     processing: document.querySelector("#count-processing"),
@@ -43,6 +45,16 @@ const elements = {
   copyFetchCode: document.querySelector("#copy-fetch-code"),
   fetchDownloadPdf: document.querySelector("#fetch-download-pdf"),
   fetchDownloadMarkdown: document.querySelector("#fetch-download-markdown"),
+  apiKeyDialog: document.querySelector("#api-key-dialog"),
+  closeApiKeyDialog: document.querySelector("#close-api-key-dialog"),
+  apiKeyStatus: document.querySelector("#api-key-status"),
+  apiKeyMetadata: document.querySelector("#api-key-metadata"),
+  apiKeyReveal: document.querySelector("#api-key-reveal"),
+  apiKeyValue: document.querySelector("#api-key-value"),
+  apiKeyWarning: document.querySelector("#api-key-warning"),
+  copyApiKey: document.querySelector("#copy-api-key"),
+  generateApiKey: document.querySelector("#generate-api-key"),
+  revokeApiKey: document.querySelector("#revoke-api-key"),
   toastRegion: document.querySelector("#toast-region"),
 };
 
@@ -58,6 +70,7 @@ let currentMarkdown = "";
 let currentFetchExample = "";
 let uploading = false;
 let refreshTimer;
+let apiKeyConfigured = false;
 
 function formatBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes < 1) {
@@ -326,6 +339,81 @@ async function checkHealth() {
   }
 }
 
+function renderApiKeyStatus(status) {
+  apiKeyConfigured = status.configured;
+  elements.apiKeyStatus.textContent = status.configured
+    ? "API key aktif"
+    : "Belum ada API key";
+  elements.apiKeyMetadata.textContent = status.configured
+    ? `${status.prefix}… · dibuat ${formatTime(status.createdAt)}`
+    : "Buat key untuk mengaktifkan akses API eksternal.";
+  elements.generateApiKey.textContent = status.configured
+    ? "Rotasi API key"
+    : "Buat API key";
+  elements.revokeApiKey.disabled = !status.configured;
+}
+
+async function openApiKeyDialog() {
+  elements.apiKeyReveal.hidden = true;
+  elements.apiKeyValue.textContent = "";
+  elements.apiKeyWarning.hidden = true;
+  elements.apiKeyDialog.showModal();
+  try {
+    const response = await api("/auth/api-key");
+    renderApiKeyStatus(await response.json());
+  } catch (error) {
+    elements.apiKeyWarning.textContent = error.message;
+    elements.apiKeyWarning.hidden = false;
+  }
+}
+
+function closeApiKeyDialog() {
+  elements.apiKeyValue.textContent = "";
+  elements.apiKeyReveal.hidden = true;
+  elements.apiKeyDialog.close();
+}
+
+async function generateApiKey() {
+  if (
+    apiKeyConfigured &&
+    !window.confirm(
+      "Rotasi API key? Key lama akan langsung berhenti berfungsi.",
+    )
+  ) {
+    return;
+  }
+
+  elements.generateApiKey.disabled = true;
+  try {
+    const response = await api("/auth/api-key", { method: "POST" });
+    const result = await response.json();
+    elements.apiKeyValue.textContent = result.apiKey;
+    elements.apiKeyReveal.hidden = false;
+    renderApiKeyStatus({ configured: true, ...result });
+    showToast("API key baru berhasil dibuat.");
+  } catch (error) {
+    showToast(error.message, "error");
+  } finally {
+    elements.generateApiKey.disabled = false;
+  }
+}
+
+async function revokeApiKey() {
+  if (!window.confirm("Cabut API key aktif? Client eksternal akan kehilangan akses.")) {
+    return;
+  }
+  elements.revokeApiKey.disabled = true;
+  try {
+    await api("/auth/api-key", { method: "DELETE" });
+    elements.apiKeyReveal.hidden = true;
+    renderApiKeyStatus({ configured: false });
+    showToast("API key telah dicabut.");
+  } catch (error) {
+    showToast(error.message, "error");
+    elements.revokeApiKey.disabled = false;
+  }
+}
+
 async function uploadSelected() {
   if (uploading || selectedFiles.length === 0) {
     return;
@@ -418,9 +506,13 @@ function createFetchExample(job) {
   const baseUrl = window.location.origin;
 
   return `const baseUrl = ${JSON.stringify(baseUrl)};
+const apiKey = "GANTI_DENGAN_API_KEY";
+const headers = { "X-API-Key": apiKey };
 
 async function ambilSurat(id) {
-  const statusResponse = await fetch(\`\${baseUrl}/v1/jobs/\${id}\`);
+  const statusResponse = await fetch(\`\${baseUrl}/v1/jobs/\${id}\`, {
+    headers,
+  });
 
   if (!statusResponse.ok) {
     throw new Error(\`Surat tidak ditemukan (\${statusResponse.status})\`);
@@ -432,8 +524,8 @@ async function ambilSurat(id) {
   }
 
   const [pdfResponse, markdownResponse] = await Promise.all([
-    fetch(\`\${baseUrl}\${job.pdfUrl}\`),
-    fetch(\`\${baseUrl}\${job.markdownUrl}\`),
+    fetch(\`\${baseUrl}\${job.pdfUrl}\`, { headers }),
+    fetch(\`\${baseUrl}\${job.markdownUrl}\`, { headers }),
   ]);
 
   if (!pdfResponse.ok || !markdownResponse.ok) {
@@ -451,6 +543,7 @@ async function ambilSurat(id) {
 async function hapusSurat(id) {
   const response = await fetch(\`\${baseUrl}/v1/jobs/\${id}\`, {
     method: "DELETE",
+    headers,
   });
 
   if (!response.ok) {
@@ -532,6 +625,30 @@ elements.clearSelection.addEventListener("click", () => {
 
 elements.uploadButton.addEventListener("click", uploadSelected);
 elements.refreshButton.addEventListener("click", () => refreshJobs());
+elements.apiKeyButton.addEventListener("click", openApiKeyDialog);
+elements.closeApiKeyDialog.addEventListener("click", closeApiKeyDialog);
+elements.apiKeyDialog.addEventListener("click", (event) => {
+  if (event.target === elements.apiKeyDialog) {
+    closeApiKeyDialog();
+  }
+});
+elements.apiKeyDialog.addEventListener("close", () => {
+  elements.apiKeyValue.textContent = "";
+  elements.apiKeyReveal.hidden = true;
+});
+elements.generateApiKey.addEventListener("click", generateApiKey);
+elements.revokeApiKey.addEventListener("click", revokeApiKey);
+elements.copyApiKey.addEventListener("click", async () => {
+  await copyText(elements.apiKeyValue.textContent, "API key disalin.");
+});
+elements.logoutButton.addEventListener("click", async () => {
+  elements.logoutButton.disabled = true;
+  try {
+    await fetch("/logout", { method: "POST" });
+  } finally {
+    window.location.replace("/login");
+  }
+});
 elements.closeDialog.addEventListener("click", closeResultDialog);
 elements.dialog.addEventListener("click", (event) => {
   if (event.target === elements.dialog) {

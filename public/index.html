@@ -22,9 +22,18 @@
           </span>
         </a>
 
-        <div class="service-status" id="service-status" role="status">
-          <span class="status-dot" aria-hidden="true"></span>
-          <span id="service-status-text">Memeriksa mesin…</span>
+        <div class="topbar-actions">
+          <div class="service-status" id="service-status" role="status">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span id="service-status-text">Memeriksa mesin…</span>
+          </div>
+          <a class="logout-button" href="/docs">API Docs</a>
+          <button class="logout-button" id="api-key-button" type="button">
+            API Key
+          </button>
+          <button class="logout-button" id="logout-button" type="button">
+            Keluar
+          </button>
         </div>
       </div>
     </header>
@@ -260,7 +269,8 @@
       <div class="fetch-dialog-body">
         <p class="api-intro">
           Gunakan ID surat berikut untuk memeriksa status, mengambil PDF asli,
-          dan membaca hasil Markdown melalui API.
+          dan membaca hasil Markdown melalui API. Client eksternal harus
+          menyertakan header <code>X-API-Key</code>.
         </p>
 
         <section class="api-id-card" aria-labelledby="job-id-label">
@@ -369,6 +379,59 @@
         <a class="secondary-button" id="fetch-download-markdown" href="#">
           Unduh Markdown
         </a>
+      </div>
+    </dialog>
+
+    <dialog class="api-key-dialog" id="api-key-dialog">
+      <div class="dialog-header">
+        <div>
+          <span class="step-label">AKSES API EKSTERNAL</span>
+          <h2>Kelola API key</h2>
+        </div>
+        <button
+          class="icon-button"
+          id="close-api-key-dialog"
+          type="button"
+          aria-label="Tutup pengelolaan API key"
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
+
+      <div class="api-key-dialog-body">
+        <p>
+          Gunakan API key untuk mengakses endpoint <code>/v1/*</code> dari
+          aplikasi eksternal melalui header <code>X-API-Key</code>.
+        </p>
+
+        <section class="api-key-status-card">
+          <span class="api-field-label">STATUS</span>
+          <strong id="api-key-status">Memeriksa…</strong>
+          <small id="api-key-metadata"></small>
+        </section>
+
+        <section class="api-key-reveal" id="api-key-reveal" hidden>
+          <span class="api-field-label">API KEY BARU — TAMPIL SEKALI</span>
+          <code id="api-key-value"></code>
+          <p>
+            Salin dan simpan sekarang. Setelah dialog ditutup, key lengkap
+            tidak dapat dilihat kembali.
+          </p>
+          <button class="secondary-button" id="copy-api-key" type="button">
+            Salin API key
+          </button>
+        </section>
+
+        <p class="api-key-warning" id="api-key-warning" hidden></p>
+      </div>
+
+      <div class="api-key-dialog-actions">
+        <button class="secondary-button danger-button" id="revoke-api-key" type="button">
+          Cabut key
+        </button>
+        <button class="primary-button" id="generate-api-key" type="button">
+          Buat API key
+        </button>
       </div>
     </dialog>
 

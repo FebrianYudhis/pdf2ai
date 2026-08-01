@@ -2,9 +2,19 @@ import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
 import { convert } from "@opendataloader/pdf";
 import Fastify from "fastify";
-import { open } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import {
+  mkdir,
+  open,
+  readFile,
+  rename,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { generateSecret, generateURI, verifySync } from "otplib";
+import QRCode from "qrcode";
 
 import { ensureJava } from "./app.js";
 import { JobError, JobQueue } from "./job-queue.js";
@@ -43,7 +53,6 @@ export function loadConfig() {
   if (!["auto", "full"].includes(hybridMode)) {
     throw new Error("ODL_HYBRID_MODE harus 'auto' atau 'full'.");
   }
-
   return {
     host: process.env.HOST ?? "127.0.0.1",
     port: numberFromEnv("PORT", 3000),
@@ -52,11 +61,142 @@ export function loadConfig() {
     hybridMode,
     hybridUrl: process.env.ODL_HYBRID_URL ?? "http://127.0.0.1:5002",
     hybridTimeout: process.env.ODL_HYBRID_TIMEOUT ?? "0",
+    authEnabled: true,
+    sessionHours: numberFromEnv("APP_SESSION_HOURS", 12),
+    mfaIssuer: process.env.APP_TOTP_ISSUER?.trim() || "PDF2AI",
+    mfaAccount: process.env.APP_TOTP_ACCOUNT?.trim() || "Dashboard",
+    authFile: resolve(
+      process.env.APP_AUTH_FILE ??
+        join(import.meta.dirname, "..", "data", "auth.json"),
+    ),
     dataDirectory: resolve(
       process.env.ODL_DATA_DIR ??
         join(import.meta.dirname, "..", "data", "jobs"),
     ),
   };
+}
+
+const SESSION_COOKIE = "pdf2ai_session";
+
+function parseCookies(header = "") {
+  return Object.fromEntries(
+    header
+      .split(";")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => {
+        const separator = part.indexOf("=");
+        if (separator === -1) {
+          return [part, ""];
+        }
+        const value = part.slice(separator + 1);
+        try {
+          return [part.slice(0, separator), decodeURIComponent(value)];
+        } catch {
+          return [part.slice(0, separator), value];
+        }
+      }),
+  );
+}
+
+function validMfaCode(secret, token) {
+  const normalized = String(token).replace(/\s/g, "");
+  if (!/^\d{6}$/.test(normalized)) {
+    return false;
+  }
+  try {
+    return verifySync({
+      secret,
+      token: normalized,
+      epochTolerance: 30,
+    }).valid;
+  } catch {
+    return false;
+  }
+}
+
+function hashApiKey(apiKey) {
+  return createHash("sha256").update(String(apiKey)).digest("hex");
+}
+
+function validApiKeyHash(expectedHash, apiKey) {
+  if (!/^[a-f0-9]{64}$/.test(expectedHash ?? "")) {
+    return false;
+  }
+  const actual = Buffer.from(hashApiKey(apiKey), "hex");
+  const expected = Buffer.from(expectedHash, "hex");
+  return timingSafeEqual(actual, expected);
+}
+
+function sessionCookie(token, maxAge, secure = false) {
+  const attributes = [
+    `${SESSION_COOKIE}=${encodeURIComponent(token)}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Strict",
+    `Max-Age=${Math.max(0, Math.floor(maxAge))}`,
+  ];
+  if (secure) {
+    attributes.push("Secure");
+  }
+  return attributes.join("; ");
+}
+
+async function loadMfaConfig(path) {
+  let contents;
+  try {
+    contents = await readFile(path, "utf8");
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return null;
+    }
+    throw error;
+  }
+
+  let config;
+  try {
+    config = JSON.parse(contents);
+  } catch {
+    throw new Error(
+      `Konfigurasi TOTP rusak atau bukan JSON yang valid: ${path}`,
+    );
+  }
+  if (
+    config.version !== 1 ||
+    typeof config.secret !== "string" ||
+    !/^[A-Z2-7]{16,128}$/.test(config.secret)
+  ) {
+    throw new Error(`Konfigurasi TOTP tidak valid: ${path}`);
+  }
+  if (
+    config.apiKey !== undefined &&
+    (typeof config.apiKey !== "object" ||
+      !/^[a-f0-9]{64}$/.test(config.apiKey.hash ?? "") ||
+      typeof config.apiKey.prefix !== "string" ||
+      typeof config.apiKey.createdAt !== "string")
+  ) {
+    throw new Error(`Konfigurasi API key tidak valid: ${path}`);
+  }
+  return config;
+}
+
+async function saveMfaConfig(path, config) {
+  await mkdir(dirname(path), { recursive: true });
+  const temporaryPath = `${path}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`;
+  try {
+    await writeFile(temporaryPath, `${JSON.stringify(config, null, 2)}\n`, {
+      encoding: "utf8",
+      mode: 0o600,
+      flag: "wx",
+    });
+    await rename(temporaryPath, path);
+  } finally {
+    await unlink(temporaryPath).catch((error) => {
+      if (error.code !== "ENOENT") {
+        throw error;
+      }
+    });
+  }
 }
 
 export async function checkHybridHealth(baseUrl, timeoutMs = 3_000) {
@@ -215,6 +355,91 @@ export async function buildServer({
   await jobs.init();
   app.decorate("jobs", jobs);
 
+  const authEnabled = config.authEnabled !== false;
+  const authFile = config.authFile ?? join(dataDirectory, "auth.json");
+  let mfaConfig = authEnabled ? await loadMfaConfig(authFile) : null;
+  const sessionLifetimeSeconds = Math.floor(
+    (config.sessionHours ?? 12) * 60 * 60,
+  );
+  const sessions = new Map();
+  const setupTokens = new Map();
+  const failedLogins = new Map();
+  const publicPaths = new Set([
+    "/health",
+    "/login",
+    "/login.js",
+    "/setup",
+    "/setup.js",
+    "/setup/start",
+    "/setup/confirm",
+    "/styles.css",
+  ]);
+
+  function removeExpiredSessions() {
+    const now = Date.now();
+    for (const [token, expiresAt] of sessions) {
+      if (expiresAt <= now) {
+        sessions.delete(token);
+      }
+    }
+  }
+
+  function cookieSession(request) {
+    removeExpiredSessions();
+    const token = parseCookies(request.headers.cookie)[SESSION_COOKIE];
+    return token && sessions.has(token) ? token : null;
+  }
+
+  function isAuthenticated(request) {
+    return !authEnabled || Boolean(cookieSession(request));
+  }
+
+  function hasValidApiKey(request) {
+    const apiKey = request.headers["x-api-key"];
+    return (
+      typeof apiKey === "string" &&
+      Boolean(mfaConfig?.apiKey) &&
+      validApiKeyHash(mfaConfig.apiKey.hash, apiKey)
+    );
+  }
+
+  app.addHook("onRequest", async (request, reply) => {
+    if (!authEnabled) {
+      return;
+    }
+
+    const pathname = request.raw.url.split("?", 1)[0];
+    const publicApi = pathname === "/v1" || pathname.startsWith("/v1/");
+    if (publicPaths.has(pathname) || pathname.startsWith("/fonts/")) {
+      return;
+    }
+    if (publicApi) {
+      if (isAuthenticated(request) || hasValidApiKey(request)) {
+        return;
+      }
+      return reply.code(401).send({
+        error: mfaConfig?.apiKey
+          ? "API key tidak valid atau tidak dikirim."
+          : "API key belum dibuat dari dashboard.",
+      });
+    }
+    if (isAuthenticated(request)) {
+      return;
+    }
+
+    if (
+      request.method === "GET" &&
+      request.headers.accept?.includes("text/html")
+    ) {
+      return reply.redirect(mfaConfig ? "/login" : "/setup");
+    }
+    return reply.code(401).send({
+      error: mfaConfig
+        ? "Silakan masuk dengan kode TOTP."
+        : "Selesaikan konfigurasi TOTP terlebih dahulu.",
+    });
+  });
+
   await app.register(multipart, {
     limits: {
       files: 1,
@@ -230,8 +455,244 @@ export async function buildServer({
     index: false,
   });
 
+  function rateLimitAttempt(key) {
+    const now = Date.now();
+    const previous = failedLogins.get(key);
+    return previous?.resetAt > now
+      ? previous
+      : { count: 0, resetAt: now + 5 * 60 * 1000 };
+  }
+
+  function rejectLogin(reply, key, attempt, message) {
+    attempt.count += 1;
+    failedLogins.set(key, attempt);
+    return reply.code(401).send({ error: message });
+  }
+
+  function createSession(request, reply) {
+    const token = randomBytes(32).toString("base64url");
+    sessions.set(token, Date.now() + sessionLifetimeSeconds * 1000);
+    reply.header(
+      "Set-Cookie",
+      sessionCookie(
+        token,
+        sessionLifetimeSeconds,
+        request.protocol === "https",
+      ),
+    );
+  }
+
+  function checkRateLimit(reply, attempt) {
+    if (attempt.count < 5) {
+      return false;
+    }
+    reply.code(429).send({
+      error: "Terlalu banyak percobaan. Coba lagi dalam beberapa menit.",
+    });
+    return true;
+  }
+
+  app.get("/setup", async (_request, reply) => {
+    if (!authEnabled || mfaConfig) {
+      return reply.redirect(mfaConfig ? "/login" : "/");
+    }
+    return reply.sendFile("setup.html", {
+      maxAge: 0,
+      immutable: false,
+    });
+  });
+
+  app.post(
+    "/setup/start",
+    {
+      schema: {
+        body: {
+          type: "object",
+          additionalProperties: false,
+          properties: {},
+        },
+      },
+    },
+    async (request, reply) => {
+      if (mfaConfig) {
+        return reply.code(409).send({ error: "TOTP sudah dikonfigurasi." });
+      }
+
+      const setupToken = randomBytes(32).toString("base64url");
+      const secret = generateSecret();
+      const uri = generateURI({
+        issuer: config.mfaIssuer ?? "PDF2AI",
+        label: config.mfaAccount ?? "Dashboard",
+        secret,
+      });
+      const qrCode = await QRCode.toDataURL(uri, {
+        errorCorrectionLevel: "M",
+        margin: 2,
+        width: 280,
+      });
+      setupTokens.clear();
+      setupTokens.set(setupToken, {
+        secret,
+        expiresAt: Date.now() + 10 * 60 * 1000,
+      });
+      return reply.send({ setupToken, secret, qrCode });
+    },
+  );
+
+  app.post(
+    "/setup/confirm",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["setupToken", "code"],
+          additionalProperties: false,
+          properties: {
+            setupToken: { type: "string", minLength: 32, maxLength: 128 },
+            code: { type: "string", pattern: "^\\d{6}$" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      if (mfaConfig) {
+        return reply.code(409).send({ error: "TOTP sudah dikonfigurasi." });
+      }
+      const pending = setupTokens.get(request.body.setupToken);
+      if (!pending || pending.expiresAt <= Date.now()) {
+        setupTokens.delete(request.body.setupToken);
+        return reply.code(410).send({
+          error: "Sesi konfigurasi kedaluwarsa. Mulai konfigurasi lagi.",
+        });
+      }
+
+      const key = request.ip;
+      const attempt = rateLimitAttempt(key);
+      if (checkRateLimit(reply, attempt)) {
+        return reply;
+      }
+      if (!validMfaCode(pending.secret, request.body.code)) {
+        return rejectLogin(reply, key, attempt, "Kode TOTP tidak valid.");
+      }
+
+      const savedConfig = {
+        version: 1,
+        secret: pending.secret,
+        issuer: config.mfaIssuer ?? "PDF2AI",
+        account: config.mfaAccount ?? "Dashboard",
+        createdAt: new Date().toISOString(),
+      };
+      await saveMfaConfig(authFile, savedConfig);
+      mfaConfig = savedConfig;
+      setupTokens.clear();
+      failedLogins.delete(key);
+      createSession(request, reply);
+      return reply.send({ ok: true });
+    },
+  );
+
+  app.get("/login", async (request, reply) => {
+    if (!mfaConfig) {
+      return reply.redirect("/setup");
+    }
+    if (isAuthenticated(request)) {
+      return reply.redirect("/");
+    }
+    return reply.sendFile("login.html", {
+      maxAge: 0,
+      immutable: false,
+    });
+  });
+
+  app.post(
+    "/login",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: ["code"],
+          additionalProperties: false,
+          properties: {
+            code: { type: "string", pattern: "^\\d{6}$" },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      if (!mfaConfig) {
+        return reply.code(409).send({
+          error: "TOTP belum dikonfigurasi. Buka halaman konfigurasi awal.",
+        });
+      }
+      const key = request.ip;
+      const attempt = rateLimitAttempt(key);
+      if (checkRateLimit(reply, attempt)) {
+        return reply;
+      }
+      if (!validMfaCode(mfaConfig.secret, request.body.code)) {
+        return rejectLogin(reply, key, attempt, "Kode TOTP salah.");
+      }
+
+      failedLogins.delete(key);
+      createSession(request, reply);
+      return reply.send({ ok: true });
+    },
+  );
+
+  app.get("/auth/api-key", async () => ({
+    configured: Boolean(mfaConfig?.apiKey),
+    prefix: mfaConfig?.apiKey?.prefix ?? null,
+    createdAt: mfaConfig?.apiKey?.createdAt ?? null,
+  }));
+
+  app.post("/auth/api-key", async (_request, reply) => {
+    const apiKey = `p2ai_${randomBytes(32).toString("base64url")}`;
+    const apiKeyConfig = {
+      hash: hashApiKey(apiKey),
+      prefix: apiKey.slice(0, 12),
+      createdAt: new Date().toISOString(),
+    };
+    const nextConfig = { ...mfaConfig, apiKey: apiKeyConfig };
+    await saveMfaConfig(authFile, nextConfig);
+    mfaConfig = nextConfig;
+    return reply.code(201).send({
+      apiKey,
+      prefix: apiKeyConfig.prefix,
+      createdAt: apiKeyConfig.createdAt,
+    });
+  });
+
+  app.delete("/auth/api-key", async (_request, reply) => {
+    if (!mfaConfig?.apiKey) {
+      return reply.code(204).send();
+    }
+    const { apiKey: _removed, ...nextConfig } = mfaConfig;
+    await saveMfaConfig(authFile, nextConfig);
+    mfaConfig = nextConfig;
+    return reply.code(204).send();
+  });
+
+  app.post("/logout", async (request, reply) => {
+    const token = cookieSession(request);
+    if (token) {
+      sessions.delete(token);
+    }
+    reply.header(
+      "Set-Cookie",
+      sessionCookie("", 0, request.protocol === "https"),
+    );
+    return reply.code(204).send();
+  });
+
   app.get("/", async (_request, reply) =>
     reply.sendFile("index.html", {
+      maxAge: 0,
+      immutable: false,
+    }),
+  );
+
+  app.get("/docs", async (_request, reply) =>
+    reply.sendFile("docs.html", {
       maxAge: 0,
       immutable: false,
     }),
@@ -321,27 +782,6 @@ export async function buildServer({
   app.delete("/v1/jobs/:id", async (request, reply) => {
     await jobs.delete(request.params.id);
     return reply.code(204).send();
-  });
-
-  // Endpoint lama tetap tersedia untuk client yang membutuhkan response sinkron.
-  // Pekerjaannya tetap masuk antrean global yang sama agar OCR selalu satu per satu.
-  app.post("/v1/extract/markdown", async (request, reply) => {
-    const startedAt = Date.now();
-    const job = await receiveJob(request);
-    let markdown;
-
-    try {
-      await jobs.waitForCompletion(job.id);
-      markdown = await jobs.markdown(job.id);
-    } finally {
-      const latest = jobs.get(job.id);
-      if (["completed", "failed"].includes(latest.status)) {
-        await jobs.delete(job.id);
-      }
-    }
-
-    reply.header("X-Processing-Time-Ms", String(Date.now() - startedAt));
-    return reply.type("text/markdown; charset=utf-8").send(markdown);
   });
 
   app.setErrorHandler((error, request, reply) => {
