@@ -18,6 +18,11 @@ import QRCode from "qrcode";
 
 import { ensureJava } from "./app.js";
 import {
+  loadApplicationSettings,
+  normalizeApplicationSettings,
+  saveApplicationSettings,
+} from "./application-config.js";
+import {
   AiError,
   AiResultStore,
   createAiCompletion,
@@ -38,8 +43,8 @@ class HttpError extends Error {
   }
 }
 
-function numberFromEnv(name, fallback) {
-  const value = process.env[name];
+function numberFromEnv(environment, name, fallback) {
+  const value = environment[name];
   if (value === undefined) {
     return fallback;
   }
@@ -50,9 +55,34 @@ function numberFromEnv(name, fallback) {
   return parsed;
 }
 
-export function loadConfig() {
-  const hybrid = process.env.ODL_HYBRID ?? "docling-fast";
-  const hybridMode = process.env.ODL_HYBRID_MODE ?? "auto";
+function booleanFromEnv(environment, name, fallback) {
+  const value = environment[name];
+  if (value === undefined) {
+    return fallback;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+  throw new Error(`${name} harus bernilai true atau false.`);
+}
+
+export function loadConfig({ environment = process.env, appConfigFile } = {}) {
+  const applicationConfigFile = resolve(
+    appConfigFile ??
+      environment.APP_CONFIG_FILE ??
+      join(import.meta.dirname, "..", "data", "app-config.json"),
+  );
+  const storedSettings = loadApplicationSettings(applicationConfigFile);
+  const storedHybrid = storedSettings.ocrMode === "off" ? "off" : "docling-fast";
+  const hybrid = environment.ODL_HYBRID ?? storedHybrid;
+  const hybridMode =
+    environment.ODL_HYBRID_MODE ??
+    (storedSettings.ocrMode === "full" ? "full" : "auto");
+  const ocrDevice = environment.ODL_OCR_DEVICE ?? storedSettings.ocrDevice;
 
   if (!["off", "docling-fast"].includes(hybrid)) {
     throw new Error("ODL_HYBRID harus 'off' atau 'docling-fast'.");
@@ -60,27 +90,70 @@ export function loadConfig() {
   if (!["auto", "full"].includes(hybridMode)) {
     throw new Error("ODL_HYBRID_MODE harus 'auto' atau 'full'.");
   }
+  if (!["cpu", "auto", "cuda", "mps", "xpu"].includes(ocrDevice)) {
+    throw new Error("ODL_OCR_DEVICE harus 'cpu', 'auto', 'cuda', 'mps', atau 'xpu'.");
+  }
+  const environmentOverrides = [
+    ["ocrDevice", "ODL_OCR_DEVICE"],
+    ["ocrMode", environment.ODL_HYBRID !== undefined ? "ODL_HYBRID" : "ODL_HYBRID_MODE"],
+    ["forceOcr", "ODL_FORCE_OCR"],
+    ["ocrLanguage", "ODL_OCR_LANG"],
+    ["maxFileSizeMb", "ODL_MAX_FILE_SIZE_MB"],
+    ["aiTimeoutSeconds", "APP_AI_TIMEOUT_MS"],
+    ["sessionHours", "APP_SESSION_HOURS"],
+  ]
+    .filter(([, variable]) => environment[variable] !== undefined)
+    .map(([field, variable]) => ({ field, variable }));
+  const effectiveSettings = normalizeApplicationSettings({
+    ocrDevice,
+    ocrMode: hybrid === "off" ? "off" : hybridMode,
+    forceOcr: booleanFromEnv(environment, "ODL_FORCE_OCR", storedSettings.forceOcr),
+    ocrLanguage: environment.ODL_OCR_LANG ?? storedSettings.ocrLanguage,
+    maxFileSizeMb: numberFromEnv(
+      environment,
+      "ODL_MAX_FILE_SIZE_MB",
+      storedSettings.maxFileSizeMb,
+    ),
+    aiTimeoutSeconds:
+      numberFromEnv(
+        environment,
+        "APP_AI_TIMEOUT_MS",
+        storedSettings.aiTimeoutSeconds * 1000,
+      ) / 1000,
+    sessionHours: numberFromEnv(
+      environment,
+      "APP_SESSION_HOURS",
+      storedSettings.sessionHours,
+    ),
+  });
   return {
-    host: process.env.HOST ?? "127.0.0.1",
-    port: numberFromEnv("PORT", 3000),
-    maxFileSizeMb: numberFromEnv("ODL_MAX_FILE_SIZE_MB", 25),
+    host: environment.HOST ?? "127.0.0.1",
+    port: numberFromEnv(environment, "PORT", 3000),
+    maxFileSizeMb: effectiveSettings.maxFileSizeMb,
     hybrid,
     hybridMode,
-    hybridUrl: process.env.ODL_HYBRID_URL ?? "http://127.0.0.1:5002",
-    hybridTimeout: process.env.ODL_HYBRID_TIMEOUT ?? "0",
+    ocrDevice: effectiveSettings.ocrDevice,
+    forceOcr: effectiveSettings.forceOcr,
+    ocrLanguage: effectiveSettings.ocrLanguage,
+    hybridUrl: environment.ODL_HYBRID_URL ?? "http://127.0.0.1:5002",
+    hybridTimeout: environment.ODL_HYBRID_TIMEOUT ?? "0",
     authEnabled: true,
-    sessionHours: numberFromEnv("APP_SESSION_HOURS", 12),
-    aiTimeoutMs: numberFromEnv("APP_AI_TIMEOUT_MS", 300_000),
-    mfaIssuer: process.env.APP_TOTP_ISSUER?.trim() || "PDF2AI",
-    mfaAccount: process.env.APP_TOTP_ACCOUNT?.trim() || "Dashboard",
+    sessionHours: effectiveSettings.sessionHours,
+    aiTimeoutMs: effectiveSettings.aiTimeoutSeconds * 1000,
+    mfaIssuer: environment.APP_TOTP_ISSUER?.trim() || "PDF2AI",
+    mfaAccount: environment.APP_TOTP_ACCOUNT?.trim() || "Dashboard",
     authFile: resolve(
-      process.env.APP_AUTH_FILE ??
+      environment.APP_AUTH_FILE ??
         join(import.meta.dirname, "..", "data", "auth.json"),
     ),
     dataDirectory: resolve(
-      process.env.ODL_DATA_DIR ??
+      environment.ODL_DATA_DIR ??
         join(import.meta.dirname, "..", "data", "jobs"),
     ),
+    applicationConfigFile,
+    applicationSettings: storedSettings,
+    effectiveApplicationSettings: effectiveSettings,
+    applicationEnvironmentOverrides: environmentOverrides,
   };
 }
 
@@ -416,6 +489,22 @@ export async function buildServer({
 
   const authEnabled = config.authEnabled !== false;
   const authFile = config.authFile ?? join(dataDirectory, "auth.json");
+  const applicationConfigFile =
+    config.applicationConfigFile ?? join(dataDirectory, ".app-config.json");
+  const activeApplicationSettings = normalizeApplicationSettings(
+    config.effectiveApplicationSettings ?? {
+      ocrDevice: config.ocrDevice ?? "cpu",
+      ocrMode: config.hybrid === "off" ? "off" : config.hybridMode ?? "auto",
+      forceOcr: config.forceOcr ?? false,
+      ocrLanguage: config.ocrLanguage ?? "english",
+      maxFileSizeMb: config.maxFileSizeMb ?? 25,
+      aiTimeoutSeconds: (config.aiTimeoutMs ?? 300_000) / 1000,
+      sessionHours: config.sessionHours ?? 12,
+    },
+  );
+  let applicationSettings = normalizeApplicationSettings(
+    config.applicationSettings ?? activeApplicationSettings,
+  );
   let mfaConfig = authEnabled ? await loadMfaConfig(authFile) : null;
   const sessionLifetimeSeconds = Math.floor(
     (config.sessionHours ?? 12) * 60 * 60,
@@ -732,6 +821,67 @@ export async function buildServer({
     mfaConfig = nextConfig;
     return reply.code(204).send();
   });
+
+  function publicApplicationConfig() {
+    const environmentOverrides = config.applicationEnvironmentOverrides ?? [];
+    const overriddenFields = new Set(
+      environmentOverrides.map((override) => override.field),
+    );
+    const restartFields = Object.keys(applicationSettings).filter(
+      (field) =>
+        !overriddenFields.has(field) &&
+        applicationSettings[field] !== activeApplicationSettings[field],
+    );
+    return {
+      settings: applicationSettings,
+      activeSettings: activeApplicationSettings,
+      restartRequired: restartFields.length > 0,
+      restartFields,
+      environmentOverrides,
+    };
+  }
+
+  app.get("/auth/app-config", async () => publicApplicationConfig());
+
+  app.put(
+    "/auth/app-config",
+    {
+      schema: {
+        body: {
+          type: "object",
+          required: [
+            "ocrDevice",
+            "ocrMode",
+            "forceOcr",
+            "ocrLanguage",
+            "maxFileSizeMb",
+            "aiTimeoutSeconds",
+            "sessionHours",
+          ],
+          additionalProperties: false,
+          properties: {
+            ocrDevice: {
+              type: "string",
+              enum: ["cpu", "auto", "cuda", "mps", "xpu"],
+            },
+            ocrMode: { type: "string", enum: ["auto", "full", "off"] },
+            forceOcr: { type: "boolean" },
+            ocrLanguage: { type: "string", minLength: 1, maxLength: 64 },
+            maxFileSizeMb: { type: "integer", minimum: 1, maximum: 500 },
+            aiTimeoutSeconds: { type: "integer", minimum: 1, maximum: 1800 },
+            sessionHours: { type: "integer", minimum: 1, maximum: 168 },
+          },
+        },
+      },
+    },
+    async (request) => {
+      applicationSettings = await saveApplicationSettings(
+        applicationConfigFile,
+        request.body,
+      );
+      return publicApplicationConfig();
+    },
+  );
 
   function publicAiConfig() {
     const ai = mfaConfig?.ai;

@@ -5,8 +5,7 @@ const elements = {
   topbarActions: document.querySelector("#topbar-actions"),
   serviceStatus: document.querySelector("#service-status"),
   serviceStatusText: document.querySelector("#service-status-text"),
-  aiConfigButton: document.querySelector("#ai-config-button"),
-  apiKeyButton: document.querySelector("#api-key-button"),
+  configButton: document.querySelector("#config-button"),
   logoutButton: document.querySelector("#logout-button"),
   counts: {
     queued: document.querySelector("#count-queued"),
@@ -51,8 +50,24 @@ const elements = {
   copyFetchCode: document.querySelector("#copy-fetch-code"),
   fetchDownloadPdf: document.querySelector("#fetch-download-pdf"),
   fetchDownloadMarkdown: document.querySelector("#fetch-download-markdown"),
-  apiKeyDialog: document.querySelector("#api-key-dialog"),
-  closeApiKeyDialog: document.querySelector("#close-api-key-dialog"),
+  configDialog: document.querySelector("#config-dialog"),
+  closeConfigDialog: document.querySelector("#close-config-dialog"),
+  configTabs: document.querySelectorAll("[data-config-tab]"),
+  configPanels: document.querySelectorAll("[data-config-panel]"),
+  appConfigState: document.querySelector("#app-config-state"),
+  appRestartNotice: document.querySelector("#app-restart-notice"),
+  appRestartFields: document.querySelector("#app-restart-fields"),
+  appEnvironmentOverrides: document.querySelector("#app-environment-overrides"),
+  appConfigWarning: document.querySelector("#app-config-warning"),
+  appOcrDevice: document.querySelector("#app-ocr-device"),
+  appOcrMode: document.querySelector("#app-ocr-mode"),
+  appForceOcr: document.querySelector("#app-force-ocr"),
+  appForceOcrWrapper: document.querySelector("#app-force-ocr-wrapper"),
+  appOcrLanguage: document.querySelector("#app-ocr-language"),
+  appMaxFileSize: document.querySelector("#app-max-file-size"),
+  appAiTimeout: document.querySelector("#app-ai-timeout"),
+  appSessionHours: document.querySelector("#app-session-hours"),
+  saveAppConfig: document.querySelector("#save-app-config"),
   apiKeyStatus: document.querySelector("#api-key-status"),
   apiKeyMetadata: document.querySelector("#api-key-metadata"),
   apiKeyReveal: document.querySelector("#api-key-reveal"),
@@ -61,8 +76,6 @@ const elements = {
   copyApiKey: document.querySelector("#copy-api-key"),
   generateApiKey: document.querySelector("#generate-api-key"),
   revokeApiKey: document.querySelector("#revoke-api-key"),
-  aiConfigDialog: document.querySelector("#ai-config-dialog"),
-  closeAiConfigDialog: document.querySelector("#close-ai-config-dialog"),
   aiConfigStatusText: document.querySelector("#ai-config-status-text"),
   aiConfigStatusMeta: document.querySelector("#ai-config-status-meta"),
   aiBaseUrl: document.querySelector("#ai-base-url"),
@@ -151,6 +164,7 @@ let latestJobs = [];
 let importedAiModels = [];
 let importedAiBaseUrl = "";
 let currentAiJob = null;
+let applicationConfig = null;
 let aiConfig = {
   configured: false,
   baseUrl: "",
@@ -462,6 +476,134 @@ async function confirmDeletion({ title, text, confirmButtonText = "Hapus" }) {
   return result.isConfirmed;
 }
 
+const applicationFieldLabels = {
+  ocrDevice: "perangkat OCR",
+  ocrMode: "strategi ekstraksi",
+  forceOcr: "paksa OCR",
+  ocrLanguage: "bahasa OCR",
+  maxFileSizeMb: "batas ukuran PDF",
+  aiTimeoutSeconds: "timeout AI",
+  sessionHours: "durasi sesi",
+};
+
+function selectConfigTab(name, { focus = false } = {}) {
+  elements.configTabs.forEach((tab) => {
+    const active = tab.dataset.configTab === name;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", String(active));
+    tab.tabIndex = active ? 0 : -1;
+    if (active && focus) {
+      tab.focus();
+    }
+  });
+  elements.configPanels.forEach((panel) => {
+    panel.hidden = panel.dataset.configPanel !== name;
+  });
+}
+
+function syncForceOcrAvailability() {
+  const disabled = elements.appOcrMode.value === "off";
+  elements.appForceOcr.disabled = disabled;
+  elements.appForceOcrWrapper.classList.toggle("disabled", disabled);
+  if (disabled) {
+    elements.appForceOcr.checked = false;
+  }
+}
+
+function renderApplicationConfig(result) {
+  applicationConfig = result;
+  const settings = result.settings;
+  elements.appOcrDevice.value = settings.ocrDevice;
+  elements.appOcrMode.value = settings.ocrMode;
+  elements.appForceOcr.checked = settings.forceOcr;
+  elements.appOcrLanguage.value = settings.ocrLanguage;
+  elements.appMaxFileSize.value = settings.maxFileSizeMb;
+  elements.appAiTimeout.value = settings.aiTimeoutSeconds;
+  elements.appSessionHours.value = settings.sessionHours;
+  syncForceOcrAvailability();
+
+  elements.appRestartNotice.hidden = !result.restartRequired;
+  const hasOverrides = (result.environmentOverrides ?? []).length > 0;
+  elements.appConfigState.textContent = result.restartRequired
+    ? "Menunggu restart"
+    : hasOverrides
+      ? "Override aktif"
+      : "Aktif";
+  elements.appConfigState.classList.toggle("pending", result.restartRequired);
+  elements.appConfigState.classList.toggle(
+    "overridden",
+    !result.restartRequired && hasOverrides,
+  );
+  elements.appRestartFields.textContent = result.restartRequired
+    ? `${result.restartFields.map((field) => applicationFieldLabels[field] ?? field).join(", ")} akan aktif setelah restart.`
+    : "Semua pengaturan sudah aktif.";
+
+  const overrides = result.environmentOverrides ?? [];
+  elements.appEnvironmentOverrides.hidden = overrides.length === 0;
+  if (overrides.length > 0) {
+    const title = document.createElement("strong");
+    title.textContent = "Override environment aktif";
+    const copy = document.createElement("p");
+    copy.textContent = "Nilai berikut tetap mengikuti environment variable saat aplikasi dinyalakan:";
+    const values = document.createElement("div");
+    values.append(
+      ...overrides.map(({ field, variable }) => {
+        const code = document.createElement("code");
+        code.textContent = `${applicationFieldLabels[field] ?? field}: ${variable}`;
+        return code;
+      }),
+    );
+    elements.appEnvironmentOverrides.replaceChildren(title, copy, values);
+  }
+}
+
+async function refreshApplicationConfig() {
+  const response = await api("/auth/app-config");
+  renderApplicationConfig(await response.json());
+}
+
+function collectApplicationSettings() {
+  return {
+    ocrDevice: elements.appOcrDevice.value,
+    ocrMode: elements.appOcrMode.value,
+    forceOcr: elements.appForceOcr.checked,
+    ocrLanguage: elements.appOcrLanguage.value.trim(),
+    maxFileSizeMb: Number(elements.appMaxFileSize.value),
+    aiTimeoutSeconds: Number(elements.appAiTimeout.value),
+    sessionHours: Number(elements.appSessionHours.value),
+  };
+}
+
+async function saveApplicationConfig() {
+  const controls = [
+    elements.appOcrLanguage,
+    elements.appMaxFileSize,
+    elements.appAiTimeout,
+    elements.appSessionHours,
+  ];
+  const invalid = controls.find((control) => !control.reportValidity());
+  if (invalid) {
+    invalid.focus();
+    return;
+  }
+  elements.saveAppConfig.disabled = true;
+  elements.appConfigWarning.hidden = true;
+  try {
+    const response = await api("/auth/app-config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(collectApplicationSettings()),
+    });
+    renderApplicationConfig(await response.json());
+    showToast("Pengaturan disimpan. Restart PDF2AI untuk menerapkannya.");
+  } catch (error) {
+    elements.appConfigWarning.textContent = error.message;
+    elements.appConfigWarning.hidden = false;
+  } finally {
+    elements.saveAppConfig.disabled = false;
+  }
+}
+
 function renderApiKeyStatus(status) {
   apiKeyConfigured = status.configured;
   elements.apiKeyStatus.textContent = status.configured
@@ -476,11 +618,10 @@ function renderApiKeyStatus(status) {
   elements.revokeApiKey.disabled = !status.configured;
 }
 
-async function openApiKeyDialog() {
+async function refreshApiKeyStatus() {
   elements.apiKeyReveal.hidden = true;
   elements.apiKeyValue.textContent = "";
   elements.apiKeyWarning.hidden = true;
-  elements.apiKeyDialog.showModal();
   try {
     const response = await api("/auth/api-key");
     renderApiKeyStatus(await response.json());
@@ -490,10 +631,31 @@ async function openApiKeyDialog() {
   }
 }
 
-function closeApiKeyDialog() {
+function closeConfiguration() {
+  elements.aiToken.value = "";
   elements.apiKeyValue.textContent = "";
   elements.apiKeyReveal.hidden = true;
-  elements.apiKeyDialog.close();
+  elements.configDialog.close();
+}
+
+async function openConfiguration(initialTab = "app") {
+  elements.appConfigWarning.hidden = true;
+  elements.aiConfigWarning.hidden = true;
+  elements.aiToken.value = "";
+  selectConfigTab(initialTab);
+  elements.configDialog.showModal();
+  const results = await Promise.allSettled([
+    refreshApplicationConfig(),
+    refreshAiConfig(),
+    refreshApiKeyStatus(),
+  ]);
+  const failed = results.find((result) => result.status === "rejected");
+  if (failed) {
+    showToast(failed.reason.message, "error");
+  }
+  elements.aiBaseUrl.value = aiConfig.baseUrl;
+  renderImportedModels();
+  renderTemplateEditors(aiConfig.templates);
 }
 
 async function generateApiKey() {
@@ -665,21 +827,6 @@ function collectTemplates() {
   }));
 }
 
-async function openAiConfigDialog() {
-  elements.aiConfigWarning.hidden = true;
-  elements.aiToken.value = "";
-  elements.aiConfigDialog.showModal();
-  await refreshAiConfig();
-  elements.aiBaseUrl.value = aiConfig.baseUrl;
-  renderImportedModels();
-  renderTemplateEditors(aiConfig.templates);
-}
-
-function closeAiConfigDialog() {
-  elements.aiToken.value = "";
-  elements.aiConfigDialog.close();
-}
-
 async function importAiModels() {
   const baseUrl = elements.aiBaseUrl.value.trim();
   if (!baseUrl) {
@@ -752,7 +899,6 @@ async function saveAiConfiguration() {
     importedAiBaseUrl = aiConfig.baseUrl;
     renderAiConfigStatus();
     renderJobs(latestJobs);
-    closeAiConfigDialog();
     showToast("Konfigurasi AI berhasil disimpan.");
   } catch (error) {
     elements.aiConfigWarning.textContent = error.message;
@@ -787,7 +933,11 @@ async function deleteAiConfiguration() {
     importedAiModels = [];
     importedAiBaseUrl = "";
     renderJobs(latestJobs);
-    closeAiConfigDialog();
+    renderAiConfigStatus();
+    elements.aiBaseUrl.value = "";
+    elements.aiToken.value = "";
+    renderImportedModels();
+    renderTemplateEditors([]);
     showToast("Konfigurasi AI telah dihapus.");
   } catch (error) {
     showToast(error.message, "error");
@@ -1171,16 +1321,39 @@ elements.clearSelection.addEventListener("click", () => {
 
 elements.uploadButton.addEventListener("click", uploadSelected);
 elements.refreshButton.addEventListener("click", () => refreshJobs());
-elements.aiConfigButton.addEventListener("click", openAiConfigDialog);
-elements.closeAiConfigDialog.addEventListener("click", closeAiConfigDialog);
-elements.aiConfigDialog.addEventListener("click", (event) => {
-  if (event.target === elements.aiConfigDialog) {
-    closeAiConfigDialog();
+elements.configButton.addEventListener("click", () => openConfiguration("app"));
+elements.closeConfigDialog.addEventListener("click", closeConfiguration);
+elements.configDialog.addEventListener("click", (event) => {
+  if (event.target === elements.configDialog) {
+    closeConfiguration();
   }
 });
-elements.aiConfigDialog.addEventListener("close", () => {
+elements.configDialog.addEventListener("close", () => {
   elements.aiToken.value = "";
+  elements.apiKeyValue.textContent = "";
+  elements.apiKeyReveal.hidden = true;
 });
+elements.configTabs.forEach((tab, index) => {
+  tab.addEventListener("click", () => selectConfigTab(tab.dataset.configTab));
+  tab.addEventListener("keydown", (event) => {
+    let nextIndex = index;
+    if (["ArrowDown", "ArrowRight"].includes(event.key)) {
+      nextIndex = (index + 1) % elements.configTabs.length;
+    } else if (["ArrowUp", "ArrowLeft"].includes(event.key)) {
+      nextIndex = (index - 1 + elements.configTabs.length) % elements.configTabs.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = elements.configTabs.length - 1;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    selectConfigTab(elements.configTabs[nextIndex].dataset.configTab, { focus: true });
+  });
+});
+elements.appOcrMode.addEventListener("change", syncForceOcrAvailability);
+elements.saveAppConfig.addEventListener("click", saveApplicationConfig);
 elements.aiImportModels.addEventListener("click", importAiModels);
 elements.addAiTemplate.addEventListener("click", () => {
   elements.aiTemplateList.append(createTemplateEditor());
@@ -1205,17 +1378,6 @@ elements.askAiTemplate.addEventListener("change", () => {
   elements.askAiMessage.focus();
 });
 elements.executeAskAi.addEventListener("click", executeAskAi);
-elements.apiKeyButton.addEventListener("click", openApiKeyDialog);
-elements.closeApiKeyDialog.addEventListener("click", closeApiKeyDialog);
-elements.apiKeyDialog.addEventListener("click", (event) => {
-  if (event.target === elements.apiKeyDialog) {
-    closeApiKeyDialog();
-  }
-});
-elements.apiKeyDialog.addEventListener("close", () => {
-  elements.apiKeyValue.textContent = "";
-  elements.apiKeyReveal.hidden = true;
-});
 elements.generateApiKey.addEventListener("click", generateApiKey);
 elements.revokeApiKey.addEventListener("click", revokeApiKey);
 elements.copyApiKey.addEventListener("click", async () => {

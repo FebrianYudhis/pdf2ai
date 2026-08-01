@@ -40,15 +40,17 @@
             <span class="status-dot" aria-hidden="true"></span>
             <span id="service-status-text">Memeriksa mesin…</span>
           </div>
-          <a class="logout-button" href="/docs">API Docs</a>
-          <button class="logout-button" id="ai-config-button" type="button">
-            Konfigurasi AI
+          <a class="logout-button nav-action" href="/docs">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v16H6.5A2.5 2.5 0 0 0 4 21.5v-16Zm16 0A2.5 2.5 0 0 0 17.5 3H13v16h4.5a2.5 2.5 0 0 1 2.5 2.5v-16Z" /></svg>
+            <span>Docs</span>
+          </a>
+          <button class="logout-button nav-action" id="config-button" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5" /><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34A1.7 1.7 0 0 0 14 20.93V21h-4v-.09A1.7 1.7 0 0 0 8.95 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.58 15 1.7 1.7 0 0 0 3 14v-4h.09A1.7 1.7 0 0 0 4.6 8.95a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.58 1.7 1.7 0 0 0 10 3.09V3h4v.09A1.7 1.7 0 0 0 15.05 4.6a1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.42 9 1.7 1.7 0 0 0 21 10v4h-.09A1.7 1.7 0 0 0 19.4 15Z" /></svg>
+            <span>Konfigurasi</span>
           </button>
-          <button class="logout-button" id="api-key-button" type="button">
-            API Key
-          </button>
-          <button class="logout-button" id="logout-button" type="button">
-            Keluar
+          <button class="logout-button nav-action" id="logout-button" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3M13 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6" /></svg>
+            <span>Keluar</span>
           </button>
         </div>
       </div>
@@ -68,7 +70,7 @@
           <span class="pipeline-number">AI</span>
           <div>
             <strong>OCR + Markdown</strong>
-            <small>Antrean stabil untuk perangkat CPU, tanpa membutuhkan GPU.</small>
+            <small>CPU stabil atau akselerator sesuai konfigurasi.</small>
           </div>
         </div>
       </section>
@@ -412,154 +414,107 @@
       </div>
     </dialog>
 
-    <dialog class="api-key-dialog" id="api-key-dialog">
+    <dialog class="config-dialog" id="config-dialog">
       <div class="dialog-header">
         <div>
-          <span class="step-label">AKSES API EKSTERNAL</span>
-          <h2>Kelola API key</h2>
+          <span class="step-label">PENGATURAN PDF2AI</span>
+          <h2>Konfigurasi</h2>
         </div>
         <button
           class="icon-button"
-          id="close-api-key-dialog"
+          id="close-config-dialog"
           type="button"
-          aria-label="Tutup pengelolaan API key"
+          aria-label="Tutup konfigurasi"
         >
           <span aria-hidden="true">×</span>
         </button>
       </div>
 
-      <div class="api-key-dialog-body">
-        <p>
-          Gunakan API key untuk mengakses endpoint <code>/v1/*</code> dari
-          aplikasi eksternal melalui header <code>X-API-Key</code>.
-        </p>
-
-        <section class="api-key-status-card">
-          <span class="api-field-label">STATUS</span>
-          <strong id="api-key-status">Memeriksa…</strong>
-          <small id="api-key-metadata"></small>
-        </section>
-
-        <section class="api-key-reveal" id="api-key-reveal" hidden>
-          <span class="api-field-label">API KEY BARU — TAMPIL SEKALI</span>
-          <code id="api-key-value"></code>
-          <p>
-            Salin dan simpan sekarang. Setelah dialog ditutup, key lengkap
-            tidak dapat dilihat kembali.
-          </p>
-          <button class="secondary-button" id="copy-api-key" type="button">
-            Salin API key
+      <div class="config-layout">
+        <div class="config-tabs" role="tablist" aria-label="Bagian konfigurasi">
+          <button class="config-tab active" id="config-tab-app" type="button" role="tab" aria-selected="true" aria-controls="config-panel-app" data-config-tab="app">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2" /><path d="M8 21h8M12 17v4" /></svg>
+            <span><strong>Aplikasi</strong><small>OCR &amp; performa</small></span>
           </button>
-        </section>
-
-        <p class="api-key-warning" id="api-key-warning" hidden></p>
-      </div>
-
-      <div class="api-key-dialog-actions">
-        <button class="secondary-button danger-button" id="revoke-api-key" type="button">
-          Cabut key
-        </button>
-        <button class="primary-button" id="generate-api-key" type="button">
-          Buat API key
-        </button>
-      </div>
-    </dialog>
-
-    <dialog class="ai-config-dialog" id="ai-config-dialog">
-      <div class="dialog-header">
-        <div>
-          <span class="step-label">OPENAI-COMPATIBLE</span>
-          <h2>Konfigurasi AI</h2>
-        </div>
-        <button
-          class="icon-button"
-          id="close-ai-config-dialog"
-          type="button"
-          aria-label="Tutup konfigurasi AI"
-        >
-          <span aria-hidden="true">×</span>
-        </button>
-      </div>
-
-      <div class="ai-config-body">
-        <section class="ai-config-status" id="ai-config-status">
-          <span class="api-field-label">STATUS</span>
-          <strong id="ai-config-status-text">Belum dikonfigurasi</strong>
-          <small id="ai-config-status-meta"></small>
-        </section>
-
-        <div class="ai-config-grid">
-          <label class="form-field ai-base-url-field">
-            <span>Base URL AI</span>
-            <input
-              id="ai-base-url"
-              type="url"
-              placeholder="https://api.openai.com/v1"
-              autocomplete="url"
-            />
-            <small>Sertakan prefix versi API, misalnya <code>/v1</code>.</small>
-          </label>
-
-          <label class="form-field">
-            <span>Token API</span>
-            <input
-              id="ai-token"
-              type="password"
-              placeholder="Kosongkan untuk mempertahankan token tersimpan"
-              autocomplete="new-password"
-            />
-            <small id="ai-token-hint">Token tidak pernah ditampilkan kembali.</small>
-          </label>
-        </div>
-
-        <div class="ai-import-row">
-          <div>
-            <strong>Model dari provider</strong>
-            <p>Periksa koneksi dan import daftar model dari endpoint <code>/models</code>.</p>
-          </div>
-          <button class="secondary-button" id="ai-import-models" type="button">
-            Cek &amp; import model
+          <button class="config-tab" id="config-tab-ai" type="button" role="tab" aria-selected="false" aria-controls="config-panel-ai" data-config-tab="ai" tabindex="-1">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v3M12 19v3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M2 12h3M19 12h3M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12" /></svg>
+            <span><strong>AI</strong><small>Provider &amp; template</small></span>
+          </button>
+          <button class="config-tab" id="config-tab-api" type="button" role="tab" aria-selected="false" aria-controls="config-panel-api" data-config-tab="api" tabindex="-1">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4" /><path d="m11 12 9-9M15 5l4 4M17 7l-2 2" /></svg>
+            <span><strong>API Key</strong><small>Akses eksternal</small></span>
           </button>
         </div>
 
-        <div class="ai-model-list" id="ai-model-list" aria-live="polite">
-          <p>Belum ada model yang diimpor.</p>
-        </div>
+        <div class="config-panels">
+          <section class="config-panel" id="config-panel-app" role="tabpanel" aria-labelledby="config-tab-app" data-config-panel="app">
+            <div class="config-panel-body app-config-body">
+              <div class="config-section-heading">
+                <div><span class="step-label">RUNTIME &amp; PEMROSESAN</span><h3>Konfigurasi aplikasi</h3></div>
+                <span class="runtime-badge" id="app-config-state">Aktif</span>
+              </div>
+              <p class="config-intro">Atur keseimbangan kecepatan, kompatibilitas, dan kualitas ekstraksi. Perubahan disimpan lokal dan diterapkan setelah PDF2AI direstart.</p>
+              <div class="restart-notice" id="app-restart-notice" hidden>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7" /></svg>
+                <div><strong>Restart diperlukan</strong><span id="app-restart-fields">Ada pengaturan yang belum aktif.</span></div>
+              </div>
 
-        <label class="form-field ai-default-model-field">
-          <span>Model default</span>
-          <select id="ai-default-model" disabled>
-            <option value="">Import model terlebih dahulu</option>
-          </select>
-          <small>Model ini otomatis dipilih pertama kali saat membuka Tanya AI.</small>
-        </label>
+              <div class="app-config-grid">
+                <section class="settings-card settings-card-wide">
+                  <div class="settings-card-heading"><span class="settings-icon">01</span><div><h4>Performa OCR</h4><p>Pilih perangkat komputasi dan strategi pembacaan dokumen.</p></div></div>
+                  <div class="settings-fields two-columns">
+                    <label class="form-field"><span>Perangkat pemrosesan</span><select id="app-ocr-device"><option value="cpu">CPU saja — kompatibilitas terbaik</option><option value="auto">Otomatis — akselerator jika tersedia</option><option value="cuda">NVIDIA CUDA</option><option value="mps">Apple Metal (MPS)</option><option value="xpu">Intel XPU</option></select><small>CUDA, MPS, dan XPU memerlukan perangkat, driver, serta runtime Python yang kompatibel.</small></label>
+                    <label class="form-field"><span>Strategi ekstraksi</span><select id="app-ocr-mode"><option value="auto">Otomatis — seimbang</option><option value="full">OCR penuh — kualitas scan</option><option value="off">Text layer saja — PDF digital</option></select><small>Mode penuh lebih akurat untuk scan, tetapi menggunakan waktu dan resource lebih besar.</small></label>
+                  </div>
+                  <label class="toggle-setting" id="app-force-ocr-wrapper"><input id="app-force-ocr" type="checkbox" /><span class="toggle-control" aria-hidden="true"></span><span><strong>Paksa OCR pada seluruh halaman</strong><small>Gunakan ketika text layer bawaan PDF rusak atau tidak dapat dipercaya.</small></span></label>
+                </section>
 
-        <section class="ai-template-section">
-          <div class="ai-template-heading">
-            <div>
-              <span class="step-label">PROMPT TERSIMPAN</span>
-              <h3>Template pertanyaan</h3>
+                <section class="settings-card">
+                  <div class="settings-card-heading"><span class="settings-icon">02</span><div><h4>OCR &amp; unggahan</h4><p>Model bahasa dan batas input.</p></div></div>
+                  <div class="settings-fields"><label class="form-field"><span>Bahasa/model OCR</span><input id="app-ocr-language" type="text" maxlength="64" placeholder="english" /><small>RapidOCR bawaan menggunakan <code>english</code>.</small></label><label class="form-field"><span>Ukuran PDF maksimum</span><div class="input-suffix"><input id="app-max-file-size" type="number" min="1" max="500" step="1" /><span>MB</span></div><small>Rentang 1–500 MB per dokumen.</small></label></div>
+                </section>
+
+                <section class="settings-card">
+                  <div class="settings-card-heading"><span class="settings-icon">03</span><div><h4>Waktu &amp; sesi</h4><p>Batas tunggu provider dan login.</p></div></div>
+                  <div class="settings-fields"><label class="form-field"><span>Timeout jawaban AI</span><div class="input-suffix"><input id="app-ai-timeout" type="number" min="1" max="1800" step="1" /><span>detik</span></div><small>Rentang 1–1800 detik.</small></label><label class="form-field"><span>Durasi sesi dashboard</span><div class="input-suffix"><input id="app-session-hours" type="number" min="1" max="168" step="1" /><span>jam</span></div><small>Berlaku untuk sesi login baru.</small></label></div>
+                </section>
+              </div>
+              <div class="environment-overrides" id="app-environment-overrides" hidden></div>
+              <p class="api-key-warning" id="app-config-warning" hidden></p>
             </div>
-            <button class="secondary-button" id="add-ai-template" type="button">
-              + Template
-            </button>
-          </div>
-          <div class="ai-template-list" id="ai-template-list"></div>
-          <p class="ai-empty-copy" id="ai-template-empty">
-            Belum ada template. Anda tetap dapat menulis pertanyaan manual.
-          </p>
-        </section>
+            <div class="config-panel-actions"><span>Disimpan di <code>data/app-config.json</code></span><button class="primary-button" id="save-app-config" type="button">Simpan pengaturan</button></div>
+          </section>
 
-        <p class="api-key-warning" id="ai-config-warning" hidden></p>
-      </div>
+          <section class="config-panel" id="config-panel-ai" role="tabpanel" aria-labelledby="config-tab-ai" data-config-panel="ai" hidden>
+            <div class="ai-config-body">
+              <section class="ai-config-status" id="ai-config-status"><span class="api-field-label">STATUS</span><strong id="ai-config-status-text">Belum dikonfigurasi</strong><small id="ai-config-status-meta"></small></section>
+              <div class="ai-config-grid">
+                <label class="form-field ai-base-url-field"><span>Base URL AI</span><input id="ai-base-url" type="url" placeholder="https://api.openai.com/v1" autocomplete="url" /><small>Sertakan prefix versi API, misalnya <code>/v1</code>.</small></label>
+                <label class="form-field"><span>Token API</span><input id="ai-token" type="password" placeholder="Kosongkan untuk mempertahankan token tersimpan" autocomplete="new-password" /><small id="ai-token-hint">Token tidak pernah ditampilkan kembali.</small></label>
+              </div>
+              <div class="ai-import-row"><div><strong>Model dari provider</strong><p>Periksa koneksi dan import daftar model dari endpoint <code>/models</code>.</p></div><button class="secondary-button" id="ai-import-models" type="button">Cek &amp; import model</button></div>
+              <div class="ai-model-list" id="ai-model-list" aria-live="polite"><p>Belum ada model yang diimpor.</p></div>
+              <label class="form-field ai-default-model-field"><span>Model default</span><select id="ai-default-model" disabled><option value="">Import model terlebih dahulu</option></select><small>Model ini otomatis dipilih pertama kali saat membuka Tanya AI.</small></label>
+              <section class="ai-template-section">
+                <div class="ai-template-heading"><div><span class="step-label">PROMPT TERSIMPAN</span><h3>Template pertanyaan</h3></div><button class="secondary-button" id="add-ai-template" type="button">+ Template</button></div>
+                <div class="ai-template-list" id="ai-template-list"></div>
+                <p class="ai-empty-copy" id="ai-template-empty">Belum ada template. Anda tetap dapat menulis pertanyaan manual.</p>
+              </section>
+              <p class="api-key-warning" id="ai-config-warning" hidden></p>
+            </div>
+            <div class="ai-dialog-actions"><button class="secondary-button danger-button" id="delete-ai-config" type="button">Hapus konfigurasi</button><button class="primary-button" id="save-ai-config" type="button">Simpan konfigurasi</button></div>
+          </section>
 
-      <div class="ai-dialog-actions">
-        <button class="secondary-button danger-button" id="delete-ai-config" type="button">
-          Hapus konfigurasi
-        </button>
-        <button class="primary-button" id="save-ai-config" type="button">
-          Simpan konfigurasi
-        </button>
+          <section class="config-panel" id="config-panel-api" role="tabpanel" aria-labelledby="config-tab-api" data-config-panel="api" hidden>
+            <div class="api-key-dialog-body">
+              <p>Gunakan API key untuk mengakses endpoint <code>/v1/*</code> dari aplikasi eksternal melalui header <code>X-API-Key</code>.</p>
+              <section class="api-key-status-card"><span class="api-field-label">STATUS</span><strong id="api-key-status">Memeriksa…</strong><small id="api-key-metadata"></small></section>
+              <section class="api-key-reveal" id="api-key-reveal" hidden><span class="api-field-label">API KEY BARU — TAMPIL SEKALI</span><code id="api-key-value"></code><p>Salin dan simpan sekarang. Setelah dialog ditutup, key lengkap tidak dapat dilihat kembali.</p><button class="secondary-button" id="copy-api-key" type="button">Salin API key</button></section>
+              <p class="api-key-warning" id="api-key-warning" hidden></p>
+            </div>
+            <div class="api-key-dialog-actions"><button class="secondary-button danger-button" id="revoke-api-key" type="button">Cabut key</button><button class="primary-button" id="generate-api-key" type="button">Buat API key</button></div>
+          </section>
+        </div>
       </div>
     </dialog>
 

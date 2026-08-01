@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { generateSync } from "otplib";
 
+import { saveApplicationSettings } from "../src/application-config.js";
 import { buildServer, loadConfig } from "../src/server.js";
 
 function testConfig() {
@@ -51,6 +52,73 @@ test("konfigurasi TOTP tidak memerlukan APP_PASSWORD", () => {
       process.env.APP_PASSWORD = previousPassword;
     }
   }
+});
+
+test("konfigurasi aplikasi persisten dimuat saat startup", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "pdf2ai-app-config-test-"));
+  const appConfigFile = join(directory, "app-config.json");
+  await saveApplicationSettings(appConfigFile, {
+    ocrDevice: "auto",
+    ocrMode: "full",
+    forceOcr: true,
+    ocrLanguage: "english",
+    maxFileSizeMb: 64,
+    aiTimeoutSeconds: 420,
+    sessionHours: 36,
+  });
+
+  const config = loadConfig({ environment: {}, appConfigFile });
+  assert.equal(config.ocrDevice, "auto");
+  assert.equal(config.hybridMode, "full");
+  assert.equal(config.forceOcr, true);
+  assert.equal(config.maxFileSizeMb, 64);
+  assert.equal(config.aiTimeoutMs, 420_000);
+  assert.equal(config.sessionHours, 36);
+});
+
+test("konfigurasi aplikasi disimpan dan menandai perubahan yang perlu restart", async (t) => {
+  const config = testConfig();
+  const app = await buildServer({ config });
+  t.after(() => app.close());
+
+  const initial = await app.inject({ method: "GET", url: "/auth/app-config" });
+  assert.equal(initial.statusCode, 200);
+  assert.equal(initial.json().settings.ocrDevice, "cpu");
+  assert.equal(initial.json().settings.ocrMode, "off");
+  assert.equal(initial.json().restartRequired, false);
+
+  const settings = {
+    ocrDevice: "cuda",
+    ocrMode: "full",
+    forceOcr: true,
+    ocrLanguage: "english",
+    maxFileSizeMb: 80,
+    aiTimeoutSeconds: 600,
+    sessionHours: 24,
+  };
+  const saved = await app.inject({
+    method: "PUT",
+    url: "/auth/app-config",
+    payload: settings,
+  });
+  assert.equal(saved.statusCode, 200);
+  assert.deepEqual(saved.json().settings, settings);
+  assert.equal(saved.json().restartRequired, true);
+  assert.ok(saved.json().restartFields.includes("ocrDevice"));
+  assert.ok(saved.json().restartFields.includes("maxFileSizeMb"));
+
+  const document = JSON.parse(
+    readFileSync(join(config.dataDirectory, ".app-config.json"), "utf8"),
+  );
+  assert.equal(document.version, 1);
+  assert.deepEqual(document.settings, settings);
+
+  const invalid = await app.inject({
+    method: "PUT",
+    url: "/auth/app-config",
+    payload: { ...settings, ocrDevice: "gpu-ajaib" },
+  });
+  assert.equal(invalid.statusCode, 400);
 });
 
 function multipartPdf(
@@ -102,7 +170,11 @@ test("dashboard dan health endpoint tersedia", async (t) => {
   assert.match(page.body, /data-result-tab="metadata"/);
   assert.match(page.body, /data-result-tab="markdown"/);
   assert.match(page.body, /DELETE · HAPUS DATA/);
-  assert.match(page.body, /Konfigurasi AI/);
+  assert.match(page.body, /id="config-button"/);
+  assert.match(page.body, /id="config-dialog"/);
+  assert.match(page.body, /data-config-tab="app"/);
+  assert.match(page.body, /data-config-tab="ai"/);
+  assert.match(page.body, /data-config-tab="api"/);
   assert.match(page.body, /id="fetch-ai-results-url"/);
   assert.match(page.body, /id="mobile-menu-button"/);
   assert.match(page.body, /aria-controls="topbar-actions"/);

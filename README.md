@@ -17,7 +17,8 @@ tidak diperlukan untuk penggunaan dashboard sehari-hari.
 ## Fitur utama
 
 - Upload satu atau beberapa PDF melalui drag-and-drop.
-- Pemrosesan di latar belakang satu per satu agar stabil tanpa GPU.
+- Pemrosesan di latar belakang satu per satu dengan mode CPU atau akselerator
+  GPU yang kompatibel.
 - Antrean dan data dokumen tetap tersedia setelah aplikasi dimulai ulang.
 - OCR scan melalui Docling, RapidOCR, dan ONNX Runtime.
 - Fallback text layer untuk PDF digital dengan hasil parser yang rusak.
@@ -30,6 +31,7 @@ tidak diperlukan untuk penggunaan dashboard sehari-hari.
 - Dashboard responsif dengan tema terang dan gelap otomatis.
 - Login dengan kode TOTP 6 digit dari aplikasi authenticator standar, tanpa
   password tambahan.
+- Satu modal **Konfigurasi** untuk pengaturan aplikasi, AI, dan API key.
 - API key yang dapat dibuat, dirotasi, dan dicabut oleh pengguna yang login.
 - Tanya AI untuk setiap PDF selesai melalui provider OpenAI-compatible.
 - Import model dari provider, template pertanyaan, dan riwayat jawaban persisten.
@@ -115,16 +117,33 @@ kode TOTP 6 digit tanpa password.
    - PDF asli;
    - informasi pemrosesan; dan
    - hasil Markdown.
-5. Opsional: klik **Konfigurasi AI** untuk menghubungkan provider, memeriksa
-   token, mengimpor model, memilih model default, dan membuat template
-   pertanyaan. Tombol **Tanya AI** akan tersedia setelah konfigurasi valid.
-6. Opsional: klik **API Key** jika aplikasi lain perlu mengambil data PDF2AI.
-   Panduan lengkap tersedia melalui menu **API Docs**.
+5. Buka **Konfigurasi → AI** untuk menghubungkan provider, memeriksa token,
+   mengimpor model, memilih model default, dan membuat template pertanyaan.
+   Tombol **Tanya AI** akan tersedia setelah konfigurasi valid.
+6. Buka **Konfigurasi → API Key** jika aplikasi lain perlu mengambil data
+   PDF2AI. Panduan lengkap tersedia melalui menu **Docs**.
 7. Gunakan tombol **Hapus** hanya jika Anda ingin menghapus PDF dan seluruh
    hasilnya secara permanen.
 
 Browser boleh ditutup setelah upload selesai. Job akan terus diproses oleh
 server dan dimuat kembali ketika aplikasi dimulai ulang.
+
+### Mengatur aplikasi
+
+Buka **Konfigurasi → Aplikasi** untuk mengubah:
+
+- perangkat OCR: CPU, otomatis, NVIDIA CUDA, Apple MPS, atau Intel XPU;
+- strategi ekstraksi: otomatis, OCR penuh, atau text layer saja;
+- pemaksaan OCR untuk seluruh halaman dan bahasa/model OCR;
+- ukuran maksimum satu PDF;
+- timeout jawaban provider AI; dan
+- durasi sesi login dashboard.
+
+Pengaturan disimpan di `data/app-config.json`. Restart PDF2AI setelah menyimpan
+agar proses OCR, batas upload, dan sesi baru menggunakan nilai tersebut. Pilihan
+CUDA, MPS, atau XPU tidak memasang driver maupun runtime akselerasi secara
+otomatis; komputer dan environment Python tetap harus mendukung perangkat yang
+dipilih. Instalasi bawaan tetap mengutamakan kompatibilitas CPU.
 
 ## Cara kerja (gambaran teknis)
 
@@ -170,9 +189,9 @@ Dokumentasi interaktif tersedia di `/docs` setelah login TOTP. Halaman tersebut
 menyediakan navigasi semua endpoint, contoh response, status error, serta tombol
 salin untuk contoh cURL dan JavaScript.
 
-TOTP melindungi dashboard web. Setelah login, buka **API Key** di bagian atas
-dashboard untuk membuat key. Key lengkap hanya ditampilkan sekali; membuat key
-baru otomatis menonaktifkan key lama.
+TOTP melindungi dashboard web. Setelah login, buka **Konfigurasi → API Key**
+untuk membuat key. Key lengkap hanya ditampilkan sekali; membuat key baru
+otomatis menonaktifkan key lama.
 
 Client eksternal harus mengirim key melalui header:
 
@@ -300,7 +319,7 @@ PDF sumber, metadata, Markdown, dan seluruh hasil Tanya AI secara permanen.
 
 ### Tanya AI
 
-Sebelum memakai endpoint AI, login TOTP lalu buka **Konfigurasi AI**:
+Sebelum memakai endpoint AI, login TOTP lalu buka **Konfigurasi → AI**:
 
 1. Isi Base URL OpenAI-compatible hingga prefix versinya, misalnya
    `https://api.openai.com/v1`.
@@ -485,6 +504,7 @@ browser.
 | --- | --- | --- |
 | `APP_SESSION_HOURS` | `12` | Durasi sesi login browser dalam jam |
 | `APP_AUTH_FILE` | `data/auth.json` | Lokasi konfigurasi rahasia TOTP |
+| `APP_CONFIG_FILE` | `data/app-config.json` | Lokasi pengaturan aplikasi dari dashboard |
 | `APP_TOTP_ISSUER` | `PDF2AI` | Nama aplikasi di authenticator |
 | `APP_TOTP_ACCOUNT` | `Dashboard` | Nama akun di authenticator |
 | `APP_AI_TIMEOUT_MS` | `300000` | Timeout request jawaban AI dalam milidetik |
@@ -551,6 +571,8 @@ data/jobs/<job-id>/
 
 data/jobs/.ai-results/
 └── <hasil-ai-id>.json
+
+data/app-config.json
 ```
 
 `result.md` tersedia setelah job selesai. Job yang berstatus `processing` ketika
@@ -572,6 +594,7 @@ server berhenti akan dikembalikan menjadi `queued` saat startup berikutnya.
 │   └── setup-ocr.js
 ├── src/
 │   ├── app.js
+│   ├── application-config.js
 │   ├── ai.js
 │   ├── job-queue.js
 │   ├── pdf-text-fallback.js
@@ -636,6 +659,9 @@ curl http://127.0.0.1:5002/health
 - Token provider AI perlu tersedia dalam bentuk asli untuk request keluar dan
   disimpan lokal di `data/auth.json`. Endpoint konfigurasi hanya mengembalikan
   status serta potongan token, tidak pernah token lengkap.
+- Pengaturan aplikasi non-rahasia disimpan di `data/app-config.json`. Environment
+  variable yang terkait memiliki prioritas lebih tinggi dan ditampilkan sebagai
+  override aktif pada modal konfigurasi.
 - Cookie sesi menggunakan `HttpOnly` dan `SameSite=Strict`; atribut `Secure`
   aktif ketika aplikasi diakses melalui HTTPS.
 - Setup pertama tidak memiliki password pelindung. Selesaikan enrollment saat

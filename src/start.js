@@ -21,22 +21,6 @@ function sleep(milliseconds) {
   );
 }
 
-function booleanFromEnv(name, fallback) {
-  const value = process.env[name];
-  if (value === undefined) {
-    return fallback;
-  }
-
-  const normalized = value.trim().toLowerCase();
-  if (["1", "true", "yes", "on"].includes(normalized)) {
-    return true;
-  }
-  if (["0", "false", "no", "off"].includes(normalized)) {
-    return false;
-  }
-  throw new Error(`${name} harus bernilai true atau false.`);
-}
-
 async function waitForHybrid(timeoutMs = 180_000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -68,8 +52,7 @@ function startOcrProcess() {
 
   const url = new URL(config.hybridUrl);
   const ocrEngine = process.env.ODL_OCR_ENGINE ?? "rapidocr";
-  const ocrLanguage =
-    process.env.ODL_OCR_LANG ??
+  const ocrLanguage = config.ocrLanguage ??
     (ocrEngine === "rapidocr" ? "english" : "id,en");
   const args = [
     "-m",
@@ -83,16 +66,16 @@ function startOcrProcess() {
     "--ocr-lang",
     ocrLanguage,
     "--device",
-    process.env.ODL_OCR_DEVICE ?? "cpu",
+    config.ocrDevice ?? "cpu",
   ];
-  const forceOcr = booleanFromEnv("ODL_FORCE_OCR", false);
+  const forceOcr = config.forceOcr ?? false;
   if (forceOcr) {
     args.push("--force-ocr");
   }
 
   console.log(
     `Menyalakan backend OCR (engine=${ocrEngine}, ` +
-      `device=${process.env.ODL_OCR_DEVICE ?? "cpu"}, force=${forceOcr})...`,
+      `device=${config.ocrDevice ?? "cpu"}, force=${forceOcr})...`,
   );
   const child = spawn(python, args, {
     cwd: root,

@@ -4,6 +4,25 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) dan versi mengikuti
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2026-08-01
+
+### Added
+
+- Konfigurasi aplikasi persisten dari dashboard untuk perangkat OCR
+  (`cpu`, `auto`, `cuda`, `mps`, atau `xpu`), strategi ekstraksi, paksa OCR,
+  bahasa OCR, batas upload, timeout AI, dan durasi sesi.
+- Endpoint berbasis sesi `GET /auth/app-config` dan `PUT /auth/app-config`
+  untuk membaca serta menyimpan pengaturan aplikasi di `data/app-config.json`.
+- Indikator restart dan environment override agar pengguna dapat membedakan
+  pengaturan tersimpan dengan runtime yang sedang aktif.
+
+### Changed
+
+- Navigasi dashboard disederhanakan menjadi tiga aksi berikon: **Docs**,
+  **Konfigurasi**, dan **Keluar**.
+- Pengaturan aplikasi, provider AI, template pertanyaan, dan API key kini
+  dikelola dari satu modal konfigurasi responsif.
+
 ## [1.2.0] - 2026-08-01
 
 ### Added
