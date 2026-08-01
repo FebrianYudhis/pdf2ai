@@ -4,6 +4,23 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) dan versi mengikuti
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-08-01
+
+### Added
+
+- Indikator **AI menjawab…** per dokumen selama permintaan Tanya AI masih
+  diproses di latar belakang.
+- Dialog error SweetAlert2 yang langsung menampilkan nama dokumen dan pesan
+  kegagalan dari provider AI atau jaringan.
+
+### Changed
+
+- Permintaan Tanya AI kini berjalan independen dan paralel antar-dokumen.
+  Setelah pertanyaan dikirim, dialog ditutup otomatis sehingga pengguna dapat
+  langsung menanyakan dokumen lain tanpa menunggu respons sebelumnya selesai.
+- Konteks setiap permintaan dikunci ke dokumen, model, template, dan pesan saat
+  eksekusi agar respons paralel tidak tertukar ketika pengguna berpindah file.
+
 ## [1.3.0] - 2026-08-01
 
 ### Added

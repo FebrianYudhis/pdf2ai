@@ -172,6 +172,8 @@ let activeFolderFilter = "all";
 let importedAiModels = [];
 let importedAiBaseUrl = "";
 let currentAiJob = null;
+const pendingAiRequests = new Map();
+let aiErrorAlertQueue = Promise.resolve();
 let applicationConfig = null;
 let aiConfig = {
   configured: false,
@@ -256,6 +258,38 @@ async function api(path, options = {}) {
     throw new Error(message);
   }
   return response;
+}
+
+function showAiRequestError(job, error) {
+  const message = error instanceof Error ? error.message : String(error);
+  aiErrorAlertQueue = aiErrorAlertQueue
+    .catch(() => undefined)
+    .then(() =>
+      Swal.fire({
+        target: elements.askAiDialog.open
+          ? elements.askAiDialog
+          : document.body,
+        icon: "error",
+        title: "AI gagal menjawab",
+        text: `${job.originalName}: ${message}`,
+        confirmButtonText: "Tutup",
+        customClass: {
+          popup: "pdf2ai-swal-popup",
+          title: "pdf2ai-swal-title",
+        },
+      }),
+    );
+}
+
+function syncAskAiDialogState(jobId = currentAiJob?.id) {
+  if (!jobId || currentAiJob?.id !== jobId) {
+    return;
+  }
+  const pending = pendingAiRequests.has(jobId);
+  elements.executeAskAi.disabled = pending;
+  elements.askAiProgress.textContent = pending
+    ? "AI sedang membaca Markdown dan menyusun jawaban…"
+    : "";
 }
 
 function renderSelection() {
@@ -635,14 +669,17 @@ function renderJobs(jobs) {
     );
     if (job.status === "completed") {
       if (aiConfig.configured) {
-        actions.append(
-          actionButton(
-            "Tanya AI",
-            "small-action ai",
-            () => openAskAi(job),
-            "Ajukan pertanyaan tentang dokumen kepada AI",
-          ),
+        const aiRequestPending = pendingAiRequests.has(job.id);
+        const askAiButton = actionButton(
+          aiRequestPending ? "AI menjawab…" : "Tanya AI",
+          "small-action ai",
+          () => openAskAi(job),
+          aiRequestPending
+            ? "Jawaban sedang diproses di latar belakang"
+            : "Ajukan pertanyaan tentang dokumen kepada AI",
         );
+        askAiButton.setAttribute("aria-busy", String(aiRequestPending));
+        actions.append(askAiButton);
       }
       actions.append(
         actionButton(
@@ -1297,10 +1334,16 @@ async function loadAiResults(jobId) {
   try {
     const response = await api(`/v1/jobs/${encodeURIComponent(jobId)}/ai`);
     const body = await response.json();
-    renderAiResults(body.results);
+    if (currentAiJob?.id === jobId) {
+      renderAiResults(body.results);
+    }
+    return body.results;
   } catch (error) {
-    elements.askAiWarning.textContent = error.message;
-    elements.askAiWarning.hidden = false;
+    if (currentAiJob?.id === jobId) {
+      elements.askAiWarning.textContent = error.message;
+      elements.askAiWarning.hidden = false;
+    }
+    return null;
   }
 }
 
@@ -1310,7 +1353,11 @@ async function openAskAi(job) {
   elements.askAiJobName.textContent = job.originalName;
   elements.askAiMessage.value = "";
   elements.askAiWarning.hidden = true;
-  elements.askAiProgress.textContent = "";
+  elements.aiResultCount.textContent = "Memuat…";
+  const loadingResults = document.createElement("p");
+  loadingResults.className = "ai-empty-copy";
+  loadingResults.textContent = "Memuat riwayat jawaban…";
+  elements.aiResultList.replaceChildren(loadingResults);
   elements.askAiTemplate.replaceChildren(
     new Option("Tulis manual", ""),
     ...aiConfig.templates.map(
@@ -1332,6 +1379,7 @@ async function openAskAi(job) {
     ),
   );
   elements.askAiDialog.showModal();
+  syncAskAiDialogState(job.id);
   await loadAiResults(job.id);
 }
 
@@ -1344,6 +1392,10 @@ async function executeAskAi() {
   if (!currentAiJob) {
     return;
   }
+  const job = currentAiJob;
+  if (pendingAiRequests.has(job.id)) {
+    return;
+  }
   const message = elements.askAiMessage.value.trim();
   if (!message) {
     elements.askAiMessage.focus();
@@ -1351,32 +1403,45 @@ async function executeAskAi() {
     return;
   }
 
-  elements.executeAskAi.disabled = true;
-  elements.askAiWarning.hidden = true;
-  elements.askAiProgress.textContent = "AI sedang membaca Markdown dan menyusun jawaban…";
+  const request = {
+    model: elements.askAiModel.value,
+    message,
+    templateId: elements.askAiTemplate.value || null,
+  };
+  pendingAiRequests.set(job.id, request);
+  renderJobs(latestJobs);
+  closeAskAiDialog();
+  showToast(
+    `Pertanyaan untuk ${job.originalName} diproses di latar belakang. Anda dapat menanyakan file lain.`,
+  );
+  let completed = false;
   try {
     const response = await api(
-      `/v1/jobs/${encodeURIComponent(currentAiJob.id)}/ai`,
+      `/v1/jobs/${encodeURIComponent(job.id)}/ai`,
       {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: elements.askAiModel.value,
-        message,
-        templateId: elements.askAiTemplate.value || null,
-      }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(request),
       },
     );
     await response.json();
-    await loadAiResults(currentAiJob.id);
-    elements.askAiProgress.textContent = "Jawaban berhasil disimpan.";
-    showToast("AI selesai menjawab dokumen.");
+    if (currentAiJob?.id === job.id) {
+      await loadAiResults(job.id);
+      elements.askAiProgress.textContent = "Jawaban berhasil disimpan.";
+    }
+    completed = true;
+    showToast(`AI selesai menjawab ${job.originalName}.`);
   } catch (error) {
-    elements.askAiWarning.textContent = error.message;
-    elements.askAiWarning.hidden = false;
-    elements.askAiProgress.textContent = "";
+    showAiRequestError(job, error);
   } finally {
-    elements.executeAskAi.disabled = false;
+    pendingAiRequests.delete(job.id);
+    renderJobs(latestJobs);
+    if (currentAiJob?.id === job.id) {
+      elements.executeAskAi.disabled = false;
+      if (!completed) {
+        elements.askAiProgress.textContent = "";
+      }
+    }
   }
 }
 

@@ -340,6 +340,8 @@ test("dashboard dan health endpoint tersedia", async (t) => {
   assert.equal(appScript.statusCode, 200);
   assert.match(appScript.body, /confirmDeletion/);
   assert.match(appScript.body, /Swal\.fire/);
+  assert.match(appScript.body, /pendingAiRequests/);
+  assert.match(appScript.body, /AI gagal menjawab/);
   assert.equal(sweetAlert.statusCode, 200);
   assert.match(sweetAlert.headers["content-type"], /javascript/);
   assert.equal(health.statusCode, 200);
