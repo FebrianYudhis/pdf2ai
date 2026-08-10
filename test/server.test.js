@@ -296,13 +296,31 @@ test("folder dan penempatan job dimuat kembali setelah restart", async (t) => {
   assert.equal(job.json().job.folder.name, "Dokumen Legal");
 });
 
-test("dashboard dan health endpoint tersedia", async (t) => {
+test("dashboard, sub-navbar docs, Scalar API reference, dan health tersedia", async (t) => {
   const app = await buildServer({ config: testConfig() });
   t.after(() => app.close());
 
-  const [page, docs, health, oldHealth, oldAi, appScript, sweetAlert] = await Promise.all([
+  const [
+    page,
+    docs,
+    docsSlash,
+    scalarDocs,
+    scalarReference,
+    openApi,
+    guide,
+    health,
+    oldHealth,
+    oldAi,
+    appScript,
+    sweetAlert,
+  ] = await Promise.all([
     app.inject({ method: "GET", url: "/" }),
     app.inject({ method: "GET", url: "/docs" }),
+    app.inject({ method: "GET", url: "/docs/" }),
+    app.inject({ method: "GET", url: "/docs/scalar" }),
+    app.inject({ method: "GET", url: "/docs/scalar/reference/" }),
+    app.inject({ method: "GET", url: "/docs/scalar/reference/openapi.json" }),
+    app.inject({ method: "GET", url: "/guide" }),
     app.inject({ method: "GET", url: "/v1/health" }),
     app.inject({ method: "GET", url: "/health" }),
     app.inject({ method: "GET", url: "/ai" }),
@@ -330,13 +348,38 @@ test("dashboard dan health endpoint tersedia", async (t) => {
   assert.equal(docs.statusCode, 200);
   assert.match(docs.headers["content-type"], /^text\/html/);
   assert.match(docs.body, /Integrasikan PDF2AI\./);
-  assert.match(docs.body, /X-API-Key/);
-  assert.match(docs.body, /\/v1\/jobs/);
-  assert.match(docs.body, /\/v1\/folders\/:id/);
-  assert.match(docs.body, /403 Forbidden/);
-  assert.match(docs.body, /POST<\/span>\s*<code>\/v1\/jobs\/:jobId\/ai<\/code>/);
-  assert.match(docs.body, /aiResultsUrl/);
-  assert.match(docs.body, /resultUrl/);
+  assert.match(docs.body, /<ul>/);
+  assert.match(docs.body, /href="\/docs" aria-current="page"/);
+  assert.match(docs.body, /href="\/docs\/scalar"/);
+  assert.equal(docsSlash.statusCode, 200);
+  assert.equal(scalarDocs.statusCode, 200);
+  assert.match(scalarDocs.body, /href="\/docs\/scalar" aria-current="page"/);
+  assert.match(scalarDocs.body, /src="\/docs\/scalar\/reference\/"/);
+  assert.equal(scalarReference.statusCode, 200);
+  assert.match(scalarReference.body, /PDF2AI API Reference/);
+  assert.match(scalarReference.body, /scalar/);
+  assert.equal(openApi.statusCode, 200);
+  assert.match(openApi.headers["content-type"], /^application\/json/);
+  const specification = openApi.json();
+  assert.equal(specification.openapi, "3.0.3");
+  assert.equal(specification.info.version, "v1");
+  assert.ok(specification.paths["/v1/jobs"]?.post);
+  assert.ok(specification.paths["/v1/folders/{id}"]?.get);
+  assert.ok(specification.paths["/v1/jobs/{jobId}/ai/{aiId}"]?.get);
+  assert.equal(specification.paths["/login"], undefined);
+  assert.deepEqual(specification.paths["/v1/health"].get.security, []);
+  assert.equal(
+    specification.components.securitySchemes.ApiKeyAuth.name,
+    "X-API-Key",
+  );
+  assert.equal(
+    specification.paths["/v1/jobs"].post.requestBody.content[
+      "multipart/form-data"
+    ].schema.properties.file.format,
+    "binary",
+  );
+  assert.equal(guide.statusCode, 302);
+  assert.equal(guide.headers.location, "/docs");
   assert.equal(appScript.statusCode, 200);
   assert.match(appScript.body, /confirmDeletion/);
   assert.match(appScript.body, /Swal\.fire/);
@@ -439,11 +482,11 @@ test("setup TOTP sekali lalu login hanya memerlukan kode TOTP", async (t) => {
 
   const authenticatedDocs = await app.inject({
     method: "GET",
-    url: "/docs",
+    url: "/docs/scalar",
     headers: { cookie },
   });
   assert.equal(authenticatedDocs.statusCode, 200);
-  assert.match(authenticatedDocs.body, /API Documentation/);
+  assert.match(authenticatedDocs.body, /Scalar API Docs/);
 
   const initialApiKeyStatus = await app.inject({
     method: "GET",

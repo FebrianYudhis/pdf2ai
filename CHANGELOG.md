@@ -4,6 +4,17 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) dan versi mengikuti
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-08-10
+
+### Added
+
+- Sub-navbar dokumentasi untuk berpindah langsung antara panduan **Simple** di
+  `/docs` dan dokumentasi interaktif **Scalar** di `/docs/scalar`.
+- Spesifikasi OpenAPI JSON/YAML yang dibuat otomatis, dukungan **Try it**, serta
+  autentikasi `X-API-Key` dan cookie sesi melalui Scalar.
+- Rute dokumentasi manual lama `/guide` tetap kompatibel dan dialihkan ke
+  `/docs`.
+
 ## [1.3.2] - 2026-08-10
 
 ### Fixed

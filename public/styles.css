@@ -3084,6 +3084,67 @@ a:focus-visible,
   width: min(1440px, calc(100% - 64px));
 }
 
+.docs-mode-nav {
+  position: sticky;
+  top: 76px;
+  z-index: 9;
+  border-bottom: 2px solid var(--edge);
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.docs-mode-nav ul {
+  width: min(1440px, calc(100% - 64px));
+  min-height: 58px;
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  margin: 0 auto;
+  padding: 7px 0;
+  list-style: none;
+}
+
+.docs-mode-nav li {
+  display: flex;
+}
+
+.docs-mode-link {
+  min-width: 148px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 15px;
+  border: 2px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-family: "Cabinet Grotesk", sans-serif;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.docs-mode-link small {
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.docs-mode-link:hover {
+  border-color: var(--border);
+  background: var(--surface-muted);
+  color: var(--foreground);
+}
+
+.docs-mode-link[aria-current="page"] {
+  border-color: var(--edge);
+  background: var(--primary);
+  color: white;
+  box-shadow: 3px 3px 0 var(--edge);
+}
+
 .docs-version,
 .auth-badge {
   display: inline-flex;
@@ -3116,9 +3177,9 @@ a:focus-visible,
 
 .docs-sidebar {
   position: sticky;
-  top: 108px;
+  top: 174px;
   align-self: start;
-  max-height: calc(100vh - 132px);
+  max-height: calc(100vh - 198px);
   padding: 4px 18px 24px 4px;
   overflow: auto;
 }
@@ -3192,7 +3253,33 @@ a:focus-visible,
 }
 
 .docs-content > section {
-  scroll-margin-top: 104px;
+  scroll-margin-top: 172px;
+}
+
+.docs-scalar-page {
+  height: 100vh;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.docs-scalar-page .topbar,
+.docs-scalar-page .docs-mode-nav {
+  position: relative;
+  top: auto;
+}
+
+.docs-scalar-content {
+  min-height: 0;
+  background: var(--surface);
+}
+
+.docs-scalar-frame {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border: 0;
+  background: var(--surface);
 }
 
 .docs-hero {
@@ -3755,8 +3842,21 @@ a:focus-visible,
 
 @media (max-width: 760px) {
   .docs-topbar-inner,
-  .docs-layout {
+  .docs-layout,
+  .docs-mode-nav ul {
     width: calc(100% - 32px);
+  }
+
+  .docs-mode-nav {
+    top: 76px;
+  }
+
+  .docs-mode-nav ul {
+    overflow-x: auto;
+  }
+
+  .docs-mode-link {
+    min-width: 136px;
   }
 
   .docs-layout {

@@ -194,9 +194,13 @@ Base URL default:
 http://127.0.0.1:3000
 ```
 
-Dokumentasi interaktif tersedia di `/docs` setelah login TOTP. Halaman tersebut
-menyediakan navigasi semua endpoint, contoh response, status error, serta tombol
-salin untuk contoh cURL dan JavaScript.
+Dokumentasi API tersedia di `/docs` setelah login TOTP. Sub-navbar pada halaman
+dokumentasi dapat dipakai untuk berpindah antara panduan **Simple** dan referensi
+interaktif **Scalar** tanpa kembali ke dashboard. Scalar tersedia di
+`/docs/scalar`, membaca spesifikasi OpenAPI dari
+`/docs/scalar/reference/openapi.json`, dapat mengirim request langsung, dan
+menyediakan autentikasi header `X-API-Key`. Rute lama `/guide` dialihkan ke
+halaman dokumentasi Simple.
 
 TOTP melindungi dashboard web. Setelah login, buka **Konfigurasi → API Key**
 untuk membuat key. Key lengkap hanya ditampilkan sekali; membuat key baru
@@ -638,6 +642,7 @@ server berhenti akan dikembalikan menjadi `queued` saat startup berikutnya.
 │   ├── application-config.js
 │   ├── ai.js
 │   ├── job-queue.js
+│   ├── openapi.js
 │   ├── pdf-text-fallback.js
 │   ├── server.js
 │   └── start.js

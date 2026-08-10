@@ -1,6 +1,8 @@
 import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
+import swagger from "@fastify/swagger";
 import { convert } from "@opendataloader/pdf";
+import ScalarApiReference from "@scalar/fastify-api-reference";
 import Fastify from "fastify";
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import {
@@ -36,6 +38,7 @@ import {
   shouldUseTextFallback,
 } from "./pdf-text-fallback.js";
 import { FolderError, FolderStore } from "./folder-store.js";
+import { openApiOptions } from "./openapi.js";
 
 class HttpError extends Error {
   constructor(statusCode, message) {
@@ -487,6 +490,7 @@ export async function buildServer({
     bodyLimit: maxBytes + 1024 * 1024,
     requestTimeout: 0,
   });
+  await app.register(swagger, openApiOptions());
   const jobs = new JobQueue({
     dataDirectory,
     extractor,
@@ -1074,12 +1078,24 @@ export async function buildServer({
     }),
   );
 
-  app.get("/docs", async (_request, reply) =>
+  const sendSimpleDocs = async (_request, reply) =>
     reply.sendFile("docs.html", {
       maxAge: 0,
       immutable: false,
-    }),
-  );
+    });
+
+  const sendScalarDocs = async (_request, reply) =>
+    reply.sendFile("docs-scalar.html", {
+      maxAge: 0,
+      immutable: false,
+    });
+
+  app.get("/docs", sendSimpleDocs);
+  app.get("/docs/", sendSimpleDocs);
+  app.get("/docs/simple", (_request, reply) => reply.redirect("/docs"));
+  app.get("/docs/scalar", sendScalarDocs);
+  app.get("/docs/scalar/", sendScalarDocs);
+  app.get("/guide", (_request, reply) => reply.redirect("/docs"));
 
   app.get("/v1/health", async (_request, reply) => {
     const hybridReady =
@@ -1415,6 +1431,15 @@ export async function buildServer({
       error: "Ekstraksi PDF gagal.",
       requestId: request.id,
     });
+  });
+
+  await app.register(ScalarApiReference, {
+    routePrefix: "/docs/scalar/reference",
+    configuration: {
+      pageTitle: "PDF2AI API Reference",
+      theme: "purple",
+      layout: "modern",
+    },
   });
 
   return app;
