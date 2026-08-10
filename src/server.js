@@ -1,26 +1,16 @@
 import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
 import swagger from "@fastify/swagger";
-import { convert } from "@opendataloader/pdf";
 import ScalarApiReference from "@scalar/fastify-api-reference";
 import Fastify from "fastify";
-import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import {
-  mkdir,
-  open,
-  readFile,
-  rename,
-  unlink,
-  writeFile,
-} from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { randomBytes, randomUUID } from "node:crypto";
+import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { generateSecret, generateURI, verifySync } from "otplib";
+import { generateSecret, generateURI } from "otplib";
 import QRCode from "qrcode";
 
 import { ensureJava } from "./app.js";
 import {
-  loadApplicationSettings,
   normalizeApplicationSettings,
   saveApplicationSettings,
 } from "./application-config.js";
@@ -33,446 +23,33 @@ import {
 } from "./ai.js";
 import { JobError, JobQueue } from "./job-queue.js";
 import {
-  extractTextLayer,
-  plainTextToMarkdown,
-  shouldUseTextFallback,
-} from "./pdf-text-fallback.js";
+  SESSION_COOKIE,
+  hashApiKey,
+  loadMfaConfig,
+  parseCookies,
+  saveMfaConfig,
+  sessionCookie,
+  validApiKeyHash,
+  validMfaCode,
+} from "./server-auth.js";
+import { loadConfig } from "./server-config.js";
+import {
+  HttpError,
+  markdownFilename,
+  pdfFilename,
+  serializeAiResult,
+  serializeFolder,
+  serializeJob,
+} from "./server-http.js";
+import {
+  assertPdfSignature,
+  checkHybridHealth,
+  extractMarkdown,
+} from "./server-ocr.js";
 import { FolderError, FolderStore } from "./folder-store.js";
 import { openApiOptions } from "./openapi.js";
 
-class HttpError extends Error {
-  constructor(statusCode, message) {
-    super(message);
-    this.statusCode = statusCode;
-  }
-}
-
-function numberFromEnv(environment, name, fallback) {
-  const value = environment[name];
-  if (value === undefined) {
-    return fallback;
-  }
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(`${name} harus berupa angka positif.`);
-  }
-  return parsed;
-}
-
-function booleanFromEnv(environment, name, fallback) {
-  const value = environment[name];
-  if (value === undefined) {
-    return fallback;
-  }
-  const normalized = value.trim().toLowerCase();
-  if (["1", "true", "yes", "on"].includes(normalized)) {
-    return true;
-  }
-  if (["0", "false", "no", "off"].includes(normalized)) {
-    return false;
-  }
-  throw new Error(`${name} harus bernilai true atau false.`);
-}
-
-export function loadConfig({ environment = process.env, appConfigFile } = {}) {
-  const applicationConfigFile = resolve(
-    appConfigFile ??
-      environment.APP_CONFIG_FILE ??
-      join(import.meta.dirname, "..", "data", "app-config.json"),
-  );
-  const storedSettings = loadApplicationSettings(applicationConfigFile);
-  const storedHybrid = storedSettings.ocrMode === "off" ? "off" : "docling-fast";
-  const hybrid = environment.ODL_HYBRID ?? storedHybrid;
-  const hybridMode =
-    environment.ODL_HYBRID_MODE ??
-    (storedSettings.ocrMode === "full" ? "full" : "auto");
-  const ocrDevice = environment.ODL_OCR_DEVICE ?? storedSettings.ocrDevice;
-
-  if (!["off", "docling-fast"].includes(hybrid)) {
-    throw new Error("ODL_HYBRID harus 'off' atau 'docling-fast'.");
-  }
-  if (!["auto", "full"].includes(hybridMode)) {
-    throw new Error("ODL_HYBRID_MODE harus 'auto' atau 'full'.");
-  }
-  if (!["cpu", "auto", "cuda", "mps", "xpu"].includes(ocrDevice)) {
-    throw new Error("ODL_OCR_DEVICE harus 'cpu', 'auto', 'cuda', 'mps', atau 'xpu'.");
-  }
-  const environmentOverrides = [
-    ["ocrDevice", "ODL_OCR_DEVICE"],
-    ["ocrMode", environment.ODL_HYBRID !== undefined ? "ODL_HYBRID" : "ODL_HYBRID_MODE"],
-    ["forceOcr", "ODL_FORCE_OCR"],
-    ["ocrLanguage", "ODL_OCR_LANG"],
-    ["maxFileSizeMb", "ODL_MAX_FILE_SIZE_MB"],
-    ["aiTimeoutSeconds", "APP_AI_TIMEOUT_MS"],
-    ["sessionHours", "APP_SESSION_HOURS"],
-  ]
-    .filter(([, variable]) => environment[variable] !== undefined)
-    .map(([field, variable]) => ({ field, variable }));
-  const effectiveSettings = normalizeApplicationSettings({
-    ocrDevice,
-    ocrMode: hybrid === "off" ? "off" : hybridMode,
-    forceOcr: booleanFromEnv(environment, "ODL_FORCE_OCR", storedSettings.forceOcr),
-    ocrLanguage: environment.ODL_OCR_LANG ?? storedSettings.ocrLanguage,
-    maxFileSizeMb: numberFromEnv(
-      environment,
-      "ODL_MAX_FILE_SIZE_MB",
-      storedSettings.maxFileSizeMb,
-    ),
-    aiTimeoutSeconds:
-      numberFromEnv(
-        environment,
-        "APP_AI_TIMEOUT_MS",
-        storedSettings.aiTimeoutSeconds * 1000,
-      ) / 1000,
-    sessionHours: numberFromEnv(
-      environment,
-      "APP_SESSION_HOURS",
-      storedSettings.sessionHours,
-    ),
-  });
-  return {
-    host: environment.HOST ?? "127.0.0.1",
-    port: numberFromEnv(environment, "PORT", 3000),
-    maxFileSizeMb: effectiveSettings.maxFileSizeMb,
-    hybrid,
-    hybridMode,
-    ocrDevice: effectiveSettings.ocrDevice,
-    forceOcr: effectiveSettings.forceOcr,
-    ocrLanguage: effectiveSettings.ocrLanguage,
-    hybridUrl: environment.ODL_HYBRID_URL ?? "http://127.0.0.1:5002",
-    hybridTimeout: environment.ODL_HYBRID_TIMEOUT ?? "0",
-    authEnabled: true,
-    sessionHours: effectiveSettings.sessionHours,
-    aiTimeoutMs: effectiveSettings.aiTimeoutSeconds * 1000,
-    mfaIssuer: environment.APP_TOTP_ISSUER?.trim() || "PDF2AI",
-    mfaAccount: environment.APP_TOTP_ACCOUNT?.trim() || "Dashboard",
-    authFile: resolve(
-      environment.APP_AUTH_FILE ??
-        join(import.meta.dirname, "..", "data", "auth.json"),
-    ),
-    dataDirectory: resolve(
-      environment.ODL_DATA_DIR ??
-        join(import.meta.dirname, "..", "data", "jobs"),
-    ),
-    applicationConfigFile,
-    applicationSettings: storedSettings,
-    effectiveApplicationSettings: effectiveSettings,
-    applicationEnvironmentOverrides: environmentOverrides,
-  };
-}
-
-const SESSION_COOKIE = "pdf2ai_session";
-
-function parseCookies(header = "") {
-  return Object.fromEntries(
-    header
-      .split(";")
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .map((part) => {
-        const separator = part.indexOf("=");
-        if (separator === -1) {
-          return [part, ""];
-        }
-        const value = part.slice(separator + 1);
-        try {
-          return [part.slice(0, separator), decodeURIComponent(value)];
-        } catch {
-          return [part.slice(0, separator), value];
-        }
-      }),
-  );
-}
-
-function validMfaCode(secret, token) {
-  const normalized = String(token).replace(/\s/g, "");
-  if (!/^\d{6}$/.test(normalized)) {
-    return false;
-  }
-  try {
-    return verifySync({
-      secret,
-      token: normalized,
-      epochTolerance: 30,
-    }).valid;
-  } catch {
-    return false;
-  }
-}
-
-function hashApiKey(apiKey) {
-  return createHash("sha256").update(String(apiKey)).digest("hex");
-}
-
-function validApiKeyHash(expectedHash, apiKey) {
-  if (!/^[a-f0-9]{64}$/.test(expectedHash ?? "")) {
-    return false;
-  }
-  const actual = Buffer.from(hashApiKey(apiKey), "hex");
-  const expected = Buffer.from(expectedHash, "hex");
-  return timingSafeEqual(actual, expected);
-}
-
-function sessionCookie(token, maxAge, secure = false) {
-  const attributes = [
-    `${SESSION_COOKIE}=${encodeURIComponent(token)}`,
-    "Path=/",
-    "HttpOnly",
-    "SameSite=Strict",
-    `Max-Age=${Math.max(0, Math.floor(maxAge))}`,
-  ];
-  if (secure) {
-    attributes.push("Secure");
-  }
-  return attributes.join("; ");
-}
-
-async function loadMfaConfig(path) {
-  let contents;
-  try {
-    contents = await readFile(path, "utf8");
-  } catch (error) {
-    if (error.code === "ENOENT") {
-      return null;
-    }
-    throw error;
-  }
-
-  let config;
-  try {
-    config = JSON.parse(contents);
-  } catch {
-    throw new Error(
-      `Konfigurasi TOTP rusak atau bukan JSON yang valid: ${path}`,
-    );
-  }
-  if (
-    config.version !== 1 ||
-    typeof config.secret !== "string" ||
-    !/^[A-Z2-7]{16,128}$/.test(config.secret)
-  ) {
-    throw new Error(`Konfigurasi TOTP tidak valid: ${path}`);
-  }
-  if (
-    config.apiKey !== undefined &&
-    (typeof config.apiKey !== "object" ||
-      !/^[a-f0-9]{64}$/.test(config.apiKey.hash ?? "") ||
-      typeof config.apiKey.prefix !== "string" ||
-      typeof config.apiKey.createdAt !== "string")
-  ) {
-    throw new Error(`Konfigurasi API key tidak valid: ${path}`);
-  }
-  if (config.ai !== undefined) {
-    try {
-      normalizeAiBaseUrl(config.ai?.baseUrl);
-    } catch {
-      throw new Error(`Konfigurasi AI tidak valid: ${path}`);
-    }
-    if (
-      typeof config.ai !== "object" ||
-      typeof config.ai.token !== "string" ||
-      config.ai.token.length > 4096 ||
-      !Array.isArray(config.ai.models) ||
-      config.ai.models.some(
-        (model) => typeof model !== "string" || !model || model.length > 256,
-      ) ||
-      (config.ai.defaultModel !== undefined &&
-        (typeof config.ai.defaultModel !== "string" ||
-          !config.ai.models.includes(config.ai.defaultModel))) ||
-      !Array.isArray(config.ai.templates) ||
-      config.ai.templates.some(
-        (template) =>
-          typeof template?.id !== "string" ||
-          typeof template?.name !== "string" ||
-          typeof template?.prompt !== "string",
-      ) ||
-      typeof config.ai.updatedAt !== "string"
-    ) {
-      throw new Error(`Konfigurasi AI tidak valid: ${path}`);
-    }
-  }
-  return config;
-}
-
-async function saveMfaConfig(path, config) {
-  await mkdir(dirname(path), { recursive: true });
-  const temporaryPath = `${path}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`;
-  try {
-    await writeFile(temporaryPath, `${JSON.stringify(config, null, 2)}\n`, {
-      encoding: "utf8",
-      mode: 0o600,
-      flag: "wx",
-    });
-    await rename(temporaryPath, path);
-  } finally {
-    await unlink(temporaryPath).catch((error) => {
-      if (error.code !== "ENOENT") {
-        throw error;
-      }
-    });
-  }
-}
-
-export async function checkHybridHealth(baseUrl, timeoutMs = 3_000) {
-  try {
-    const response = await fetch(`${baseUrl.replace(/\/$/, "")}/health`, {
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    if (!response.ok) {
-      return false;
-    }
-    const body = await response.json();
-    return body.status === "ok";
-  } catch {
-    return false;
-  }
-}
-
-async function waitForHybridRecovery(baseUrl, timeoutMs = 120_000) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await checkHybridHealth(baseUrl, 2_000)) {
-      return true;
-    }
-    await new Promise((resolvePromise) => setTimeout(resolvePromise, 2_000));
-  }
-  return false;
-}
-
-async function assertPdfSignature(path) {
-  const handle = await open(path, "r");
-  try {
-    const header = Buffer.alloc(5);
-    const { bytesRead } = await handle.read(header, 0, header.length, 0);
-    if (bytesRead !== 5 || header.toString("ascii") !== "%PDF-") {
-      throw new HttpError(415, "File yang dikirim bukan PDF yang valid.");
-    }
-  } finally {
-    await handle.close();
-  }
-}
-
-export async function extractMarkdown(path, config) {
-  ensureJava();
-
-  const convertOnce = (hybridMode) =>
-    convert(path, {
-      format: "markdown",
-      toStdout: true,
-      quiet: true,
-      imageOutput: "off",
-      hybrid: config.hybrid === "off" ? undefined : config.hybrid,
-      hybridMode: config.hybrid === "off" ? undefined : hybridMode,
-      hybridUrl: config.hybrid === "off" ? undefined : config.hybridUrl,
-      hybridTimeout:
-        config.hybrid === "off" || config.hybridTimeout === "0"
-          ? undefined
-          : config.hybridTimeout,
-    });
-  const runOpenDataLoader = async (hybridMode) => {
-    try {
-      return await convertOnce(hybridMode);
-    } catch (error) {
-      const backendStopped =
-        config.managedHybrid === true &&
-        config.hybrid !== "off" &&
-        !(await checkHybridHealth(config.hybridUrl));
-      if (
-        !backendStopped ||
-        !(await waitForHybridRecovery(config.hybridUrl))
-      ) {
-        throw error;
-      }
-      return convertOnce(hybridMode);
-    }
-  };
-
-  let markdown = await runOpenDataLoader(config.hybridMode);
-  let textLayer = "";
-
-  try {
-    textLayer = await extractTextLayer(path);
-    if (shouldUseTextFallback(markdown, textLayer)) {
-      return plainTextToMarkdown(textLayer);
-    }
-  } catch {
-    // OCR tetap dapat berjalan jika fallback text layer tidak tersedia.
-  }
-
-  if (
-    config.hybrid !== "off" &&
-    config.hybridMode !== "full" &&
-    markdown.trim().length < 40
-  ) {
-    markdown = await runOpenDataLoader("full");
-  }
-
-  if (shouldUseTextFallback(markdown, textLayer)) {
-    return plainTextToMarkdown(textLayer);
-  }
-  if (markdown.trim().length === 0) {
-    throw new Error(
-      "Tidak ada teks yang dapat diekstrak. Periksa backend OCR dan bahasa dokumen.",
-    );
-  }
-
-  return markdown;
-}
-
-function serializeFolder(folder, jobCount = undefined) {
-  return {
-    ...folder,
-    folderUrl: `/v1/folders/${folder.id}`,
-    ...(jobCount === undefined ? {} : { jobCount }),
-  };
-}
-
-function serializeJob(job, folders) {
-  const folder = folders?.find(job.folderId);
-  return {
-    ...job,
-    // Referensi folder yang sudah tidak ada diperlakukan sebagai "Tanpa folder".
-    // Ini menjaga job lama tetap terlihat bila file folder dipulihkan/diubah
-    // secara terpisah dari metadata job.
-    folderId: folder?.id ?? null,
-    folder: folder ? serializeFolder(folder) : null,
-    folderUrl: folder ? `/v1/folders/${folder.id}` : null,
-    jobUrl: `/v1/jobs/${job.id}`,
-    pdfUrl: `/v1/jobs/${job.id}/pdf`,
-    markdownUrl:
-      job.status === "completed"
-        ? `/v1/jobs/${job.id}/markdown`
-        : null,
-    aiModelsUrl: "/v1/ai/models",
-    aiResultsUrl: `/v1/jobs/${job.id}/ai`,
-  };
-}
-
-function serializeAiResult(result) {
-  const aiResultsUrl = `/v1/jobs/${result.jobId}/ai`;
-  return {
-    ...result,
-    jobUrl: `/v1/jobs/${result.jobId}`,
-    aiModelsUrl: "/v1/ai/models",
-    aiResultsUrl,
-    resultUrl: `${aiResultsUrl}/${result.id}`,
-  };
-}
-
-function markdownFilename(originalName) {
-  const withoutPdf = originalName.replace(/\.pdf$/i, "");
-  return `${withoutPdf || "result"}.md`
-    .replace(/["\r\n]/g, "")
-    .slice(0, 180);
-}
-
-function pdfFilename(originalName) {
-  const cleaned = originalName.replace(/["\r\n]/g, "").slice(0, 180);
-  if (!cleaned) {
-    return "document.pdf";
-  }
-  return /\.pdf$/i.test(cleaned) ? cleaned : `${cleaned}.pdf`;
-}
+export { checkHybridHealth, extractMarkdown, loadConfig };
 
 export async function buildServer({
   config = loadConfig(),
@@ -546,6 +123,7 @@ export async function buildServer({
     "/setup/start",
     "/setup/confirm",
     "/styles.css",
+    "/styles-auth.css",
   ]);
 
   function removeExpiredSessions() {

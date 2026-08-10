@@ -312,6 +312,12 @@ test("dashboard, sub-navbar docs, Scalar API reference, dan health tersedia", as
     oldHealth,
     oldAi,
     appScript,
+    appElements,
+    appUtils,
+    configurationController,
+    mobileMenu,
+    authStyles,
+    docsStyles,
     sweetAlert,
   ] = await Promise.all([
     app.inject({ method: "GET", url: "/" }),
@@ -325,6 +331,12 @@ test("dashboard, sub-navbar docs, Scalar API reference, dan health tersedia", as
     app.inject({ method: "GET", url: "/health" }),
     app.inject({ method: "GET", url: "/ai" }),
     app.inject({ method: "GET", url: "/app.js" }),
+    app.inject({ method: "GET", url: "/app-elements.js" }),
+    app.inject({ method: "GET", url: "/app-utils.js" }),
+    app.inject({ method: "GET", url: "/configuration-controller.js" }),
+    app.inject({ method: "GET", url: "/mobile-menu.js" }),
+    app.inject({ method: "GET", url: "/styles-auth.css" }),
+    app.inject({ method: "GET", url: "/styles-docs.css" }),
     app.inject({ method: "GET", url: "/vendor/sweetalert2.esm.all.min.js" }),
   ]);
 
@@ -385,6 +397,19 @@ test("dashboard, sub-navbar docs, Scalar API reference, dan health tersedia", as
   assert.match(appScript.body, /Swal\.fire/);
   assert.match(appScript.body, /pendingAiRequests/);
   assert.match(appScript.body, /AI gagal menjawab/);
+  for (const moduleAsset of [
+    appElements,
+    appUtils,
+    configurationController,
+    mobileMenu,
+  ]) {
+    assert.equal(moduleAsset.statusCode, 200);
+    assert.match(moduleAsset.headers["content-type"], /javascript/);
+  }
+  for (const styleAsset of [authStyles, docsStyles]) {
+    assert.equal(styleAsset.statusCode, 200);
+    assert.match(styleAsset.headers["content-type"], /^text\/css/);
+  }
   assert.equal(sweetAlert.statusCode, 200);
   assert.match(sweetAlert.headers["content-type"], /javascript/);
   assert.equal(health.statusCode, 200);
@@ -411,7 +436,7 @@ test("setup TOTP sekali lalu login hanya memerlukan kode TOTP", async (t) => {
   });
   t.after(() => app.close());
 
-  const [dashboard, docs, api, setupPage, font, health] = await Promise.all([
+  const [dashboard, docs, api, setupPage, authStyles, font, health] = await Promise.all([
     app.inject({
       method: "GET",
       url: "/",
@@ -424,6 +449,7 @@ test("setup TOTP sekali lalu login hanya memerlukan kode TOTP", async (t) => {
     }),
     app.inject({ method: "GET", url: "/v1/jobs" }),
     app.inject({ method: "GET", url: "/setup" }),
+    app.inject({ method: "GET", url: "/styles-auth.css" }),
     app.inject({ method: "GET", url: "/fonts/inter-latin-variable.woff2" }),
     app.inject({ method: "GET", url: "/v1/health" }),
   ]);
@@ -434,6 +460,8 @@ test("setup TOTP sekali lalu login hanya memerlukan kode TOTP", async (t) => {
   assert.equal(api.statusCode, 401);
   assert.equal(setupPage.statusCode, 200);
   assert.match(setupPage.body, /Aktifkan TOTP/);
+  assert.equal(authStyles.statusCode, 200);
+  assert.match(authStyles.headers["content-type"], /^text\/css/);
   assert.equal(font.statusCode, 200);
   assert.match(font.headers["content-type"], /font\/woff2/);
   assert.equal(health.statusCode, 200);

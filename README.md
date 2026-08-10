@@ -628,11 +628,18 @@ server berhenti akan dikembalikan menjadi `queued` saat startup berikutnya.
 ```text
 .
 ├── public/
+│   ├── app-elements.js
+│   ├── app-utils.js
 │   ├── app.js
+│   ├── configuration-controller.js
 │   ├── docs.html
+│   ├── docs-scalar.html
 │   ├── docs.js
 │   ├── fonts/
 │   ├── index.html
+│   ├── mobile-menu.js
+│   ├── styles-auth.css
+│   ├── styles-docs.css
 │   └── styles.css
 ├── scripts/
 │   ├── extract-text-layer.py
@@ -644,6 +651,10 @@ server berhenti akan dikembalikan menjadi `queued` saat startup berikutnya.
 │   ├── job-queue.js
 │   ├── openapi.js
 │   ├── pdf-text-fallback.js
+│   ├── server-auth.js
+│   ├── server-config.js
+│   ├── server-http.js
+│   ├── server-ocr.js
 │   ├── server.js
 │   └── start.js
 ├── test/

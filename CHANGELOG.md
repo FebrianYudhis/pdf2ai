@@ -4,6 +4,14 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) dan versi mengikuti
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-08-10
+
+### Changed
+
+- File backend dan frontend berukuran besar dipisahkan berdasarkan tanggung
+  jawab: konfigurasi, autentikasi, HTTP, OCR, referensi DOM, utilitas UI, menu
+  mobile, controller konfigurasi, serta stylesheet autentikasi dan dokumentasi.
+
 ## [1.4.0] - 2026-08-10
 
 ### Added

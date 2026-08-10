@@ -1,157 +1,10 @@
 import Swal from "/vendor/sweetalert2.esm.all.min.js";
+import { elements } from "/app-elements.js";
+import { api, formatBytes, formatDuration, formatTime } from "/app-utils.js";
+import { createConfigurationController } from "/configuration-controller.js";
+import { initializeMobileMenu } from "/mobile-menu.js";
 
-const elements = {
-  mobileMenuButton: document.querySelector("#mobile-menu-button"),
-  topbarActions: document.querySelector("#topbar-actions"),
-  serviceStatus: document.querySelector("#service-status"),
-  serviceStatusText: document.querySelector("#service-status-text"),
-  configButton: document.querySelector("#config-button"),
-  logoutButton: document.querySelector("#logout-button"),
-  counts: {
-    queued: document.querySelector("#count-queued"),
-    processing: document.querySelector("#count-processing"),
-    completed: document.querySelector("#count-completed"),
-    failed: document.querySelector("#count-failed"),
-  },
-  dropZone: document.querySelector("#drop-zone"),
-  fileInput: document.querySelector("#file-input"),
-  selection: document.querySelector("#selection"),
-  selectionSummary: document.querySelector("#selection-summary"),
-  selectionList: document.querySelector("#selection-list"),
-  clearSelection: document.querySelector("#clear-selection"),
-  uploadButton: document.querySelector("#upload-button"),
-  uploadButtonLabel: document.querySelector("#upload-button-label"),
-  uploadFolder: document.querySelector("#upload-folder"),
-  refreshButton: document.querySelector("#refresh-button"),
-  lastUpdated: document.querySelector("#last-updated"),
-  folderFilterList: document.querySelector("#folder-filter-list"),
-  createFolderButton: document.querySelector("#create-folder-button"),
-  manageFolderButton: document.querySelector("#manage-folder-button"),
-  jobList: document.querySelector("#job-list"),
-  emptyState: document.querySelector("#empty-state"),
-  emptyStateTitle: document.querySelector("#empty-state-title"),
-  emptyStateCopy: document.querySelector("#empty-state-copy"),
-  dialog: document.querySelector("#markdown-dialog"),
-  dialogTitle: document.querySelector("#dialog-title"),
-  closeDialog: document.querySelector("#close-dialog"),
-  resultTabs: document.querySelectorAll("[data-result-tab]"),
-  resultPanels: document.querySelectorAll("[data-result-panel]"),
-  resultPdfFrame: document.querySelector("#result-pdf-frame"),
-  resultMetadata: document.querySelector("#result-metadata-panel"),
-  markdownContent: document.querySelector("#result-markdown-panel"),
-  downloadPdf: document.querySelector("#download-pdf"),
-  copyMarkdown: document.querySelector("#copy-markdown"),
-  downloadMarkdown: document.querySelector("#download-markdown"),
-  fetchDialog: document.querySelector("#fetch-dialog"),
-  fetchDialogTitle: document.querySelector("#fetch-dialog-title"),
-  closeFetchDialog: document.querySelector("#close-fetch-dialog"),
-  fetchJobId: document.querySelector("#fetch-job-id"),
-  copyJobId: document.querySelector("#copy-job-id"),
-  fetchMetadataUrl: document.querySelector("#fetch-metadata-url"),
-  fetchPdfUrl: document.querySelector("#fetch-pdf-url"),
-  fetchMarkdownUrl: document.querySelector("#fetch-markdown-url"),
-  fetchAiResultsUrl: document.querySelector("#fetch-ai-results-url"),
-  fetchDeleteUrl: document.querySelector("#fetch-delete-url"),
-  fetchCode: document.querySelector("#fetch-code"),
-  copyFetchCode: document.querySelector("#copy-fetch-code"),
-  fetchDownloadPdf: document.querySelector("#fetch-download-pdf"),
-  fetchDownloadMarkdown: document.querySelector("#fetch-download-markdown"),
-  configDialog: document.querySelector("#config-dialog"),
-  closeConfigDialog: document.querySelector("#close-config-dialog"),
-  configTabs: document.querySelectorAll("[data-config-tab]"),
-  configPanels: document.querySelectorAll("[data-config-panel]"),
-  appConfigState: document.querySelector("#app-config-state"),
-  appRestartNotice: document.querySelector("#app-restart-notice"),
-  appRestartFields: document.querySelector("#app-restart-fields"),
-  appEnvironmentOverrides: document.querySelector("#app-environment-overrides"),
-  appConfigWarning: document.querySelector("#app-config-warning"),
-  appOcrDevice: document.querySelector("#app-ocr-device"),
-  appOcrMode: document.querySelector("#app-ocr-mode"),
-  appForceOcr: document.querySelector("#app-force-ocr"),
-  appForceOcrWrapper: document.querySelector("#app-force-ocr-wrapper"),
-  appOcrLanguage: document.querySelector("#app-ocr-language"),
-  appMaxFileSize: document.querySelector("#app-max-file-size"),
-  appAiTimeout: document.querySelector("#app-ai-timeout"),
-  appSessionHours: document.querySelector("#app-session-hours"),
-  saveAppConfig: document.querySelector("#save-app-config"),
-  apiKeyStatus: document.querySelector("#api-key-status"),
-  apiKeyMetadata: document.querySelector("#api-key-metadata"),
-  apiKeyReveal: document.querySelector("#api-key-reveal"),
-  apiKeyValue: document.querySelector("#api-key-value"),
-  apiKeyWarning: document.querySelector("#api-key-warning"),
-  copyApiKey: document.querySelector("#copy-api-key"),
-  generateApiKey: document.querySelector("#generate-api-key"),
-  revokeApiKey: document.querySelector("#revoke-api-key"),
-  aiConfigStatusText: document.querySelector("#ai-config-status-text"),
-  aiConfigStatusMeta: document.querySelector("#ai-config-status-meta"),
-  aiBaseUrl: document.querySelector("#ai-base-url"),
-  aiToken: document.querySelector("#ai-token"),
-  aiTokenHint: document.querySelector("#ai-token-hint"),
-  aiImportModels: document.querySelector("#ai-import-models"),
-  aiModelList: document.querySelector("#ai-model-list"),
-  aiDefaultModel: document.querySelector("#ai-default-model"),
-  aiTemplateList: document.querySelector("#ai-template-list"),
-  aiTemplateEmpty: document.querySelector("#ai-template-empty"),
-  addAiTemplate: document.querySelector("#add-ai-template"),
-  aiConfigWarning: document.querySelector("#ai-config-warning"),
-  deleteAiConfig: document.querySelector("#delete-ai-config"),
-  saveAiConfig: document.querySelector("#save-ai-config"),
-  askAiDialog: document.querySelector("#ask-ai-dialog"),
-  closeAskAiDialog: document.querySelector("#close-ask-ai-dialog"),
-  askAiTitle: document.querySelector("#ask-ai-title"),
-  askAiJobName: document.querySelector("#ask-ai-job-name"),
-  askAiTemplate: document.querySelector("#ask-ai-template"),
-  askAiModel: document.querySelector("#ask-ai-model"),
-  askAiMessage: document.querySelector("#ask-ai-message"),
-  askAiWarning: document.querySelector("#ask-ai-warning"),
-  aiResultCount: document.querySelector("#ai-result-count"),
-  aiResultList: document.querySelector("#ai-result-list"),
-  askAiProgress: document.querySelector("#ask-ai-progress"),
-  executeAskAi: document.querySelector("#execute-ask-ai"),
-  toastRegion: document.querySelector("#toast-region"),
-};
-
-function setMobileMenuOpen(open) {
-  elements.topbarActions?.classList.toggle("is-open", open);
-  elements.mobileMenuButton?.classList.toggle("is-open", open);
-  elements.mobileMenuButton?.setAttribute("aria-expanded", String(open));
-  elements.mobileMenuButton?.setAttribute(
-    "aria-label",
-    open ? "Tutup menu navigasi" : "Buka menu navigasi",
-  );
-}
-
-elements.mobileMenuButton?.addEventListener("click", () => {
-  const isOpen = elements.mobileMenuButton.getAttribute("aria-expanded") === "true";
-  setMobileMenuOpen(!isOpen);
-});
-
-elements.topbarActions?.addEventListener("click", (event) => {
-  if (event.target.closest("a, button")) {
-    setMobileMenuOpen(false);
-  }
-});
-
-document.addEventListener("click", (event) => {
-  if (
-    elements.mobileMenuButton?.getAttribute("aria-expanded") === "true" &&
-    !event.target.closest(".topbar-inner")
-  ) {
-    setMobileMenuOpen(false);
-  }
-});
-
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") {
-    setMobileMenuOpen(false);
-  }
-});
-
-window.addEventListener("resize", () => {
-  if (window.innerWidth > 600) {
-    setMobileMenuOpen(false);
-  }
-});
+initializeMobileMenu(elements);
 
 const statusLabels = {
   queued: "Mengantre",
@@ -165,68 +18,12 @@ let currentMarkdown = "";
 let currentFetchExample = "";
 let uploading = false;
 let refreshTimer;
-let apiKeyConfigured = false;
 let latestJobs = [];
 let virtualFolders = [];
 let activeFolderFilter = "all";
-let importedAiModels = [];
-let importedAiBaseUrl = "";
 let currentAiJob = null;
 const pendingAiRequests = new Map();
 let aiErrorAlertQueue = Promise.resolve();
-let applicationConfig = null;
-let aiConfig = {
-  configured: false,
-  baseUrl: "",
-  hasToken: false,
-  tokenHint: null,
-  models: [],
-  defaultModel: null,
-  templates: [],
-  updatedAt: null,
-};
-
-function formatBytes(bytes) {
-  if (!Number.isFinite(bytes) || bytes < 1) {
-    return "0 B";
-  }
-  const units = ["B", "KB", "MB", "GB"];
-  const index = Math.min(
-    Math.floor(Math.log(bytes) / Math.log(1024)),
-    units.length - 1,
-  );
-  const value = bytes / 1024 ** index;
-  return `${value.toFixed(index === 0 || value >= 10 ? 0 : 1)} ${units[index]}`;
-}
-
-function formatTime(value) {
-  if (!value) {
-    return "—";
-  }
-  return new Intl.DateTimeFormat("id-ID", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
-
-function formatDuration(job) {
-  if (!job.startedAt) {
-    return "Menunggu giliran";
-  }
-  const end = job.completedAt ? new Date(job.completedAt) : new Date();
-  const seconds = Math.max(
-    1,
-    Math.round((end - new Date(job.startedAt)) / 1000),
-  );
-  if (seconds < 60) {
-    return `${seconds} detik`;
-  }
-  const minutes = Math.floor(seconds / 60);
-  const remainder = seconds % 60;
-  return `${minutes} m ${remainder} d`;
-}
 
 function showToast(message, type = "success") {
   const toast = document.createElement("div");
@@ -243,21 +40,6 @@ async function copyText(value, successMessage) {
   } catch {
     showToast("Browser tidak mengizinkan akses clipboard.", "error");
   }
-}
-
-async function api(path, options = {}) {
-  const response = await fetch(path, options);
-  if (!response.ok) {
-    let message = `Request gagal (${response.status}).`;
-    try {
-      const body = await response.json();
-      message = body.error || message;
-    } catch {
-      // Response non-JSON menggunakan pesan default.
-    }
-    throw new Error(message);
-  }
-  return response;
 }
 
 function showAiRequestError(job, error) {
@@ -668,7 +450,7 @@ function renderJobs(jobs) {
       ),
     );
     if (job.status === "completed") {
-      if (aiConfig.configured) {
+      if (configuration.aiConfig.configured) {
         const aiRequestPending = pendingAiRequests.has(job.id);
         const askAiButton = actionButton(
           aiRequestPending ? "AI menjawab…" : "Tanya AI",
@@ -803,464 +585,29 @@ const applicationFieldLabels = {
   sessionHours: "durasi sesi",
 };
 
-function selectConfigTab(name, { focus = false } = {}) {
-  elements.configTabs.forEach((tab) => {
-    const active = tab.dataset.configTab === name;
-    tab.classList.toggle("active", active);
-    tab.setAttribute("aria-selected", String(active));
-    tab.tabIndex = active ? 0 : -1;
-    if (active && focus) {
-      tab.focus();
-    }
-  });
-  elements.configPanels.forEach((panel) => {
-    panel.hidden = panel.dataset.configPanel !== name;
-  });
-}
+const configuration = createConfigurationController({
+  Swal,
+  elements,
+  api,
+  formatTime,
+  showToast,
+  refreshJobs,
+});
 
-function syncForceOcrAvailability() {
-  const disabled = elements.appOcrMode.value === "off";
-  elements.appForceOcr.disabled = disabled;
-  elements.appForceOcrWrapper.classList.toggle("disabled", disabled);
-  if (disabled) {
-    elements.appForceOcr.checked = false;
-  }
-}
-
-function renderApplicationConfig(result) {
-  applicationConfig = result;
-  const settings = result.settings;
-  elements.appOcrDevice.value = settings.ocrDevice;
-  elements.appOcrMode.value = settings.ocrMode;
-  elements.appForceOcr.checked = settings.forceOcr;
-  elements.appOcrLanguage.value = settings.ocrLanguage;
-  elements.appMaxFileSize.value = settings.maxFileSizeMb;
-  elements.appAiTimeout.value = settings.aiTimeoutSeconds;
-  elements.appSessionHours.value = settings.sessionHours;
-  syncForceOcrAvailability();
-
-  elements.appRestartNotice.hidden = !result.restartRequired;
-  const hasOverrides = (result.environmentOverrides ?? []).length > 0;
-  elements.appConfigState.textContent = result.restartRequired
-    ? "Menunggu restart"
-    : hasOverrides
-      ? "Override aktif"
-      : "Aktif";
-  elements.appConfigState.classList.toggle("pending", result.restartRequired);
-  elements.appConfigState.classList.toggle(
-    "overridden",
-    !result.restartRequired && hasOverrides,
-  );
-  elements.appRestartFields.textContent = result.restartRequired
-    ? `${result.restartFields.map((field) => applicationFieldLabels[field] ?? field).join(", ")} akan aktif setelah restart.`
-    : "Semua pengaturan sudah aktif.";
-
-  const overrides = result.environmentOverrides ?? [];
-  elements.appEnvironmentOverrides.hidden = overrides.length === 0;
-  if (overrides.length > 0) {
-    const title = document.createElement("strong");
-    title.textContent = "Override environment aktif";
-    const copy = document.createElement("p");
-    copy.textContent = "Nilai berikut tetap mengikuti environment variable saat aplikasi dinyalakan:";
-    const values = document.createElement("div");
-    values.append(
-      ...overrides.map(({ field, variable }) => {
-        const code = document.createElement("code");
-        code.textContent = `${applicationFieldLabels[field] ?? field}: ${variable}`;
-        return code;
-      }),
-    );
-    elements.appEnvironmentOverrides.replaceChildren(title, copy, values);
-  }
-}
-
-async function refreshApplicationConfig() {
-  const response = await api("/auth/app-config");
-  renderApplicationConfig(await response.json());
-}
-
-function collectApplicationSettings() {
-  return {
-    ocrDevice: elements.appOcrDevice.value,
-    ocrMode: elements.appOcrMode.value,
-    forceOcr: elements.appForceOcr.checked,
-    ocrLanguage: elements.appOcrLanguage.value.trim(),
-    maxFileSizeMb: Number(elements.appMaxFileSize.value),
-    aiTimeoutSeconds: Number(elements.appAiTimeout.value),
-    sessionHours: Number(elements.appSessionHours.value),
-  };
-}
-
-async function saveApplicationConfig() {
-  const controls = [
-    elements.appOcrLanguage,
-    elements.appMaxFileSize,
-    elements.appAiTimeout,
-    elements.appSessionHours,
-  ];
-  const invalid = controls.find((control) => !control.reportValidity());
-  if (invalid) {
-    invalid.focus();
-    return;
-  }
-  elements.saveAppConfig.disabled = true;
-  elements.appConfigWarning.hidden = true;
-  try {
-    const response = await api("/auth/app-config", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(collectApplicationSettings()),
-    });
-    renderApplicationConfig(await response.json());
-    showToast("Pengaturan disimpan. Restart PDF2AI untuk menerapkannya.");
-  } catch (error) {
-    elements.appConfigWarning.textContent = error.message;
-    elements.appConfigWarning.hidden = false;
-  } finally {
-    elements.saveAppConfig.disabled = false;
-  }
-}
-
-function renderApiKeyStatus(status) {
-  apiKeyConfigured = status.configured;
-  elements.apiKeyStatus.textContent = status.configured
-    ? "API key aktif"
-    : "Belum ada API key";
-  elements.apiKeyMetadata.textContent = status.configured
-    ? `${status.prefix}… · dibuat ${formatTime(status.createdAt)}`
-    : "Buat key untuk mengaktifkan akses API eksternal.";
-  elements.generateApiKey.textContent = status.configured
-    ? "Rotasi API key"
-    : "Buat API key";
-  elements.revokeApiKey.disabled = !status.configured;
-}
-
-async function refreshApiKeyStatus() {
-  elements.apiKeyReveal.hidden = true;
-  elements.apiKeyValue.textContent = "";
-  elements.apiKeyWarning.hidden = true;
-  try {
-    const response = await api("/auth/api-key");
-    renderApiKeyStatus(await response.json());
-  } catch (error) {
-    elements.apiKeyWarning.textContent = error.message;
-    elements.apiKeyWarning.hidden = false;
-  }
-}
-
-function closeConfiguration() {
-  elements.aiToken.value = "";
-  elements.apiKeyValue.textContent = "";
-  elements.apiKeyReveal.hidden = true;
-  elements.configDialog.close();
-}
-
-async function openConfiguration(initialTab = "app") {
-  elements.appConfigWarning.hidden = true;
-  elements.aiConfigWarning.hidden = true;
-  elements.aiToken.value = "";
-  selectConfigTab(initialTab);
-  elements.configDialog.showModal();
-  const results = await Promise.allSettled([
-    refreshApplicationConfig(),
-    refreshAiConfig(),
-    refreshApiKeyStatus(),
-  ]);
-  const failed = results.find((result) => result.status === "rejected");
-  if (failed) {
-    showToast(failed.reason.message, "error");
-  }
-  elements.aiBaseUrl.value = aiConfig.baseUrl;
-  renderImportedModels();
-  renderTemplateEditors(aiConfig.templates);
-}
-
-async function generateApiKey() {
-  if (
-    apiKeyConfigured &&
-    !window.confirm(
-      "Rotasi API key? Key lama akan langsung berhenti berfungsi.",
-    )
-  ) {
-    return;
-  }
-
-  elements.generateApiKey.disabled = true;
-  try {
-    const response = await api("/auth/api-key", { method: "POST" });
-    const result = await response.json();
-    elements.apiKeyValue.textContent = result.apiKey;
-    elements.apiKeyReveal.hidden = false;
-    renderApiKeyStatus({ configured: true, ...result });
-    showToast("API key baru berhasil dibuat.");
-  } catch (error) {
-    showToast(error.message, "error");
-  } finally {
-    elements.generateApiKey.disabled = false;
-  }
-}
-
-async function revokeApiKey() {
-  if (
-    !(await confirmDeletion({
-      title: "Cabut API key?",
-      text: "Client eksternal akan langsung kehilangan akses ke seluruh endpoint terproteksi.",
-      confirmButtonText: "Cabut API key",
-    }))
-  ) {
-    return;
-  }
-  elements.revokeApiKey.disabled = true;
-  try {
-    await api("/auth/api-key", { method: "DELETE" });
-    elements.apiKeyReveal.hidden = true;
-    renderApiKeyStatus({ configured: false });
-    showToast("API key telah dicabut.");
-  } catch (error) {
-    showToast(error.message, "error");
-    elements.revokeApiKey.disabled = false;
-  }
-}
-
-function renderAiConfigStatus() {
-  elements.aiConfigStatusText.textContent = aiConfig.configured
-    ? "AI siap digunakan"
-    : "Belum dikonfigurasi";
-  const details = [];
-  if (aiConfig.models.length > 0) {
-    details.push(`${aiConfig.models.length} model`);
-  }
-  if (aiConfig.defaultModel) {
-    details.push(`default ${aiConfig.defaultModel}`);
-  }
-  if (aiConfig.hasToken) {
-    details.push(`token ${aiConfig.tokenHint}`);
-  }
-  if (aiConfig.updatedAt) {
-    details.push(`diperbarui ${formatTime(aiConfig.updatedAt)}`);
-  }
-  elements.aiConfigStatusMeta.textContent = details.join(" · ") ||
-    "Hubungkan provider OpenAI-compatible untuk mengaktifkan Tanya AI.";
-  elements.deleteAiConfig.disabled = !aiConfig.configured;
-  elements.aiTokenHint.textContent = aiConfig.hasToken
-    ? `Token tersimpan: ${aiConfig.tokenHint}. Kosongkan untuk mempertahankannya.`
-    : "Token opsional untuk provider lokal dan tidak pernah ditampilkan kembali.";
-}
-
-async function refreshAiConfig() {
-  try {
-    const response = await api("/auth/ai-config");
-    aiConfig = await response.json();
-    importedAiModels = [...aiConfig.models];
-    importedAiBaseUrl = aiConfig.baseUrl;
-    renderAiConfigStatus();
-  } catch (error) {
-    showToast(error.message, "error");
-  }
-}
-
-function renderImportedModels() {
-  const preferredDefault = elements.aiDefaultModel.value || aiConfig.defaultModel;
-  if (importedAiModels.length === 0) {
-    const empty = document.createElement("p");
-    empty.textContent = "Belum ada model yang diimpor.";
-    elements.aiModelList.replaceChildren(empty);
-    elements.aiDefaultModel.replaceChildren(
-      new Option("Import model terlebih dahulu", ""),
-    );
-    elements.aiDefaultModel.disabled = true;
-    return;
-  }
-  elements.aiModelList.replaceChildren(
-    ...importedAiModels.map((model) => {
-      const item = document.createElement("code");
-      item.textContent = model;
-      return item;
-    }),
-  );
-  elements.aiDefaultModel.replaceChildren(
-    ...importedAiModels.map((model) => new Option(model, model)),
-  );
-  elements.aiDefaultModel.value = importedAiModels.includes(preferredDefault)
-    ? preferredDefault
-    : importedAiModels[0];
-  elements.aiDefaultModel.disabled = false;
-}
-
-function createTemplateEditor(template = {}) {
-  const editor = document.createElement("article");
-  editor.className = "ai-template-editor";
-  editor.dataset.templateId = template.id || crypto.randomUUID();
-
-  const nameField = document.createElement("label");
-  nameField.className = "form-field";
-  const nameLabel = document.createElement("span");
-  nameLabel.textContent = "Nama template";
-  const name = document.createElement("input");
-  name.type = "text";
-  name.maxLength = 100;
-  name.placeholder = "Contoh: Ringkasan eksekutif";
-  name.value = template.name || "";
-  name.dataset.templateName = "";
-  nameField.append(nameLabel, name);
-
-  const promptField = document.createElement("label");
-  promptField.className = "form-field ai-template-prompt";
-  const promptLabel = document.createElement("span");
-  promptLabel.textContent = "Isi pertanyaan";
-  const prompt = document.createElement("textarea");
-  prompt.rows = 4;
-  prompt.maxLength = 20_000;
-  prompt.placeholder = "Tuliskan instruksi yang dapat dipakai berulang kali…";
-  prompt.value = template.prompt || "";
-  prompt.dataset.templatePrompt = "";
-  promptField.append(promptLabel, prompt);
-
-  const remove = document.createElement("button");
-  remove.type = "button";
-  remove.className = "text-button danger-text-button";
-  remove.textContent = "Hapus template";
-  remove.addEventListener("click", () => {
-    editor.remove();
-    elements.aiTemplateEmpty.hidden = elements.aiTemplateList.children.length > 0;
-  });
-
-  editor.append(nameField, promptField, remove);
-  return editor;
-}
-
-function renderTemplateEditors(templates) {
-  elements.aiTemplateList.replaceChildren(
-    ...templates.map((template) => createTemplateEditor(template)),
-  );
-  elements.aiTemplateEmpty.hidden = templates.length > 0;
-}
-
-function collectTemplates() {
-  return [...elements.aiTemplateList.children].map((editor) => ({
-    id: editor.dataset.templateId,
-    name: editor.querySelector("[data-template-name]").value.trim(),
-    prompt: editor.querySelector("[data-template-prompt]").value.trim(),
-  }));
-}
-
-async function importAiModels() {
-  const baseUrl = elements.aiBaseUrl.value.trim();
-  if (!baseUrl) {
-    elements.aiBaseUrl.focus();
-    showToast("Isi Base URL AI terlebih dahulu.", "error");
-    return;
-  }
-  const payload = { baseUrl };
-  if (elements.aiToken.value) {
-    payload.token = elements.aiToken.value;
-  }
-  elements.aiImportModels.disabled = true;
-  elements.aiImportModels.textContent = "Memeriksa…";
-  elements.aiConfigWarning.hidden = true;
-  try {
-    const response = await api("/auth/ai-config/models", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const result = await response.json();
-    elements.aiBaseUrl.value = result.baseUrl;
-    importedAiModels = result.models;
-    importedAiBaseUrl = result.baseUrl;
-    renderImportedModels();
-    showToast(`${result.models.length} model berhasil diimpor.`);
-  } catch (error) {
-    elements.aiConfigWarning.textContent = error.message;
-    elements.aiConfigWarning.hidden = false;
-  } finally {
-    elements.aiImportModels.disabled = false;
-    elements.aiImportModels.textContent = "Cek & import model";
-  }
-}
-
-async function saveAiConfiguration() {
-  const templates = collectTemplates();
-  if (templates.some((template) => !template.name || !template.prompt)) {
-    showToast("Lengkapi nama dan isi semua template.", "error");
-    return;
-  }
-  if (importedAiModels.length === 0) {
-    showToast("Cek koneksi dan import model terlebih dahulu.", "error");
-    return;
-  }
-  if (elements.aiBaseUrl.value.trim().replace(/\/+$/, "") !== importedAiBaseUrl) {
-    showToast("Base URL berubah. Cek dan import model kembali.", "error");
-    return;
-  }
-  const payload = {
-    baseUrl: elements.aiBaseUrl.value.trim(),
-    models: importedAiModels,
-    defaultModel: elements.aiDefaultModel.value,
-    templates,
-  };
-  if (elements.aiToken.value) {
-    payload.token = elements.aiToken.value;
-  }
-
-  elements.saveAiConfig.disabled = true;
-  elements.aiConfigWarning.hidden = true;
-  try {
-    const response = await api("/auth/ai-config", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    aiConfig = await response.json();
-    importedAiModels = [...aiConfig.models];
-    importedAiBaseUrl = aiConfig.baseUrl;
-    renderAiConfigStatus();
-    renderJobs(latestJobs);
-    showToast("Konfigurasi AI berhasil disimpan.");
-  } catch (error) {
-    elements.aiConfigWarning.textContent = error.message;
-    elements.aiConfigWarning.hidden = false;
-  } finally {
-    elements.saveAiConfig.disabled = false;
-  }
-}
-
-async function deleteAiConfiguration() {
-  if (
-    !(await confirmDeletion({
-      title: "Hapus konfigurasi AI?",
-      text: "Base URL, token, model, dan template akan dihapus. Hasil Tanya AI yang sudah tersimpan tetap tersedia.",
-      confirmButtonText: "Hapus konfigurasi",
-    }))
-  ) {
-    return;
-  }
-  try {
-    await api("/auth/ai-config", { method: "DELETE" });
-    aiConfig = {
-      configured: false,
-      baseUrl: "",
-      hasToken: false,
-      tokenHint: null,
-      models: [],
-      defaultModel: null,
-      templates: [],
-      updatedAt: null,
-    };
-    importedAiModels = [];
-    importedAiBaseUrl = "";
-    renderJobs(latestJobs);
-    renderAiConfigStatus();
-    elements.aiBaseUrl.value = "";
-    elements.aiToken.value = "";
-    renderImportedModels();
-    renderTemplateEditors([]);
-    showToast("Konfigurasi AI telah dihapus.");
-  } catch (error) {
-    showToast(error.message, "error");
-  }
-}
-
+const {
+  closeConfiguration,
+  createTemplateEditor,
+  deleteAiConfiguration,
+  generateApiKey,
+  importAiModels,
+  openConfiguration,
+  refreshAiConfig,
+  revokeApiKey,
+  saveAiConfiguration,
+  saveApplicationConfig,
+  selectConfigTab,
+  syncForceOcrAvailability,
+} = configuration;
 function renderAiResults(results) {
   elements.aiResultCount.textContent = `${results.length} hasil`;
   if (results.length === 0) {
@@ -1360,20 +707,24 @@ async function openAskAi(job) {
   elements.aiResultList.replaceChildren(loadingResults);
   elements.askAiTemplate.replaceChildren(
     new Option("Tulis manual", ""),
-    ...aiConfig.templates.map(
+    ...configuration.aiConfig.templates.map(
       (template) => new Option(template.name, template.id),
     ),
   );
-  const orderedModels = aiConfig.defaultModel
+  const orderedModels = configuration.aiConfig.defaultModel
     ? [
-        aiConfig.defaultModel,
-        ...aiConfig.models.filter((model) => model !== aiConfig.defaultModel),
+        configuration.aiConfig.defaultModel,
+        ...configuration.aiConfig.models.filter(
+          (model) => model !== configuration.aiConfig.defaultModel,
+        ),
       ]
-    : aiConfig.models;
+    : configuration.aiConfig.models;
   elements.askAiModel.replaceChildren(
     ...orderedModels.map(
       (model) => new Option(
-        model === aiConfig.defaultModel ? `${model} (default)` : model,
+        model === configuration.aiConfig.defaultModel
+          ? `${model} (default)`
+          : model,
         model,
       ),
     ),
@@ -1732,7 +1083,7 @@ elements.askAiDialog.addEventListener("close", () => {
   currentAiJob = null;
 });
 elements.askAiTemplate.addEventListener("change", () => {
-  const template = aiConfig.templates.find(
+  const template = configuration.aiConfig.templates.find(
     (candidate) => candidate.id === elements.askAiTemplate.value,
   );
   elements.askAiMessage.value = template?.prompt ?? "";
