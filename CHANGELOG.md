@@ -4,6 +4,20 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) dan versi mengikuti
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2026-08-10
+
+### Fixed
+
+- Panel hasil PDF, metadata, dan Markdown kini mempertahankan tinggi area
+  tampilannya serta dapat di-scroll ketika isi dokumen panjang.
+- Klik pada backdrop kini menutup dialog hasil dokumen, Fetch Data,
+  konfigurasi, dan Tanya AI tanpa menutup dialog saat area di dalamnya diklik.
+
+### Changed
+
+- Dialog utama kini memiliki nama aksesibel yang terhubung ke judulnya melalui
+  `aria-labelledby` agar konteks dialog lebih jelas bagi pembaca layar.
+
 ## [1.3.1] - 2026-08-01
 
 ### Added

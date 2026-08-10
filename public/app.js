@@ -1539,6 +1539,25 @@ function closeResultDialog() {
   elements.resultPdfFrame.src = "about:blank";
 }
 
+function closeOnBackdropClick(dialog, closeDialog) {
+  dialog.addEventListener("click", (event) => {
+    if (event.target !== dialog) {
+      return;
+    }
+
+    const bounds = dialog.getBoundingClientRect();
+    const clickedBackdrop =
+      event.clientX < bounds.left ||
+      event.clientX > bounds.right ||
+      event.clientY < bounds.top ||
+      event.clientY > bounds.bottom;
+
+    if (clickedBackdrop) {
+      closeDialog();
+    }
+  });
+}
+
 function createFetchExample(job) {
   const baseUrl = window.location.origin;
 
@@ -1673,11 +1692,7 @@ elements.createFolderButton.addEventListener("click", createVirtualFolder);
 elements.manageFolderButton.addEventListener("click", manageCurrentFolder);
 elements.configButton.addEventListener("click", () => openConfiguration("app"));
 elements.closeConfigDialog.addEventListener("click", closeConfiguration);
-elements.configDialog.addEventListener("click", (event) => {
-  if (event.target === elements.configDialog) {
-    closeConfiguration();
-  }
-});
+closeOnBackdropClick(elements.configDialog, closeConfiguration);
 elements.configDialog.addEventListener("close", () => {
   elements.aiToken.value = "";
   elements.apiKeyValue.textContent = "";
@@ -1712,11 +1727,7 @@ elements.addAiTemplate.addEventListener("click", () => {
 elements.saveAiConfig.addEventListener("click", saveAiConfiguration);
 elements.deleteAiConfig.addEventListener("click", deleteAiConfiguration);
 elements.closeAskAiDialog.addEventListener("click", closeAskAiDialog);
-elements.askAiDialog.addEventListener("click", (event) => {
-  if (event.target === elements.askAiDialog) {
-    closeAskAiDialog();
-  }
-});
+closeOnBackdropClick(elements.askAiDialog, closeAskAiDialog);
 elements.askAiDialog.addEventListener("close", () => {
   currentAiJob = null;
 });
@@ -1742,11 +1753,7 @@ elements.logoutButton.addEventListener("click", async () => {
   }
 });
 elements.closeDialog.addEventListener("click", closeResultDialog);
-elements.dialog.addEventListener("click", (event) => {
-  if (event.target === elements.dialog) {
-    closeResultDialog();
-  }
-});
+closeOnBackdropClick(elements.dialog, closeResultDialog);
 elements.dialog.addEventListener("close", () => {
   elements.resultPdfFrame.src = "about:blank";
 });
@@ -1778,11 +1785,7 @@ elements.resultTabs.forEach((tab, index) => {
 elements.closeFetchDialog.addEventListener("click", () =>
   elements.fetchDialog.close(),
 );
-elements.fetchDialog.addEventListener("click", (event) => {
-  if (event.target === elements.fetchDialog) {
-    elements.fetchDialog.close();
-  }
-});
+closeOnBackdropClick(elements.fetchDialog, () => elements.fetchDialog.close());
 
 elements.copyMarkdown.addEventListener("click", async () => {
   await copyText(currentMarkdown, "Markdown disalin ke clipboard.");
