@@ -8,3 +8,4 @@ logs/
 data/
 graphify-out
 .codex
+.codebase-memory/

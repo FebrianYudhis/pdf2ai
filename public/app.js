@@ -1,6 +1,12 @@
 import Swal from "/vendor/sweetalert2.esm.all.min.js";
 import { elements } from "/app-elements.js";
-import { api, formatBytes, formatDuration, formatTime } from "/app-utils.js";
+import {
+  api,
+  formatBytes,
+  formatDuration,
+  formatLastUpdated,
+  formatTime,
+} from "/app-utils.js";
 import { createConfigurationController } from "/configuration-controller.js";
 import { initializeMobileMenu } from "/mobile-menu.js";
 
@@ -11,6 +17,16 @@ const statusLabels = {
   processing: "Memproses",
   completed: "Selesai",
   failed: "Gagal",
+};
+
+const actionIconPaths = {
+  result:
+    "M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12Zm9.5-2.75a2.75 2.75 0 1 0 0 5.5 2.75 2.75 0 0 0 0-5.5Z",
+  ai: "m12 3 1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3ZM5 15l.8 2.2L8 18l-2.2.8L5 21l-.8-2.2L2 18l2.2-.8L5 15Zm14-12 .6 1.4L21 5l-1.4.6L19 7l-.6-1.4L17 5l1.4-.6L19 3Z",
+  api: "m8 8-4 4 4 4m8-8 4 4-4 4m-3-10-2 12",
+  folder:
+    "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Zm6 6h6m-3-3 3 3-3 3",
+  danger: "M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13m-8 4v5m4-5v5",
 };
 
 let selectedFiles = [];
@@ -25,11 +41,33 @@ let currentAiJob = null;
 const pendingAiRequests = new Map();
 let aiErrorAlertQueue = Promise.resolve();
 
+function getActiveAlertTarget() {
+  const openDialogs = document.querySelectorAll("dialog[open]");
+  return openDialogs.item(openDialogs.length - 1) ?? document.body;
+}
+
+function getActiveToastRegion() {
+  const target = getActiveAlertTarget();
+  if (target === document.body) {
+    return elements.toastRegion;
+  }
+
+  let region = target.querySelector(":scope > .modal-toast-region");
+  if (!region) {
+    region = document.createElement("div");
+    region.className = "toast-region modal-toast-region";
+    region.setAttribute("aria-live", "polite");
+    region.setAttribute("aria-atomic", "true");
+    target.append(region);
+  }
+  return region;
+}
+
 function showToast(message, type = "success") {
   const toast = document.createElement("div");
   toast.className = `toast ${type === "error" ? "error" : ""}`;
   toast.textContent = message;
-  elements.toastRegion.append(toast);
+  getActiveToastRegion().append(toast);
   window.setTimeout(() => toast.remove(), 4200);
 }
 
@@ -48,9 +86,7 @@ function showAiRequestError(job, error) {
     .catch(() => undefined)
     .then(() =>
       Swal.fire({
-        target: elements.askAiDialog.open
-          ? elements.askAiDialog
-          : document.body,
+        target: getActiveAlertTarget(),
         icon: "error",
         title: "AI gagal menjawab",
         text: `${job.originalName}: ${message}`,
@@ -118,15 +154,81 @@ function addFiles(files) {
   renderSelection();
 }
 
-function actionButton(label, className, handler, title = label) {
+function actionIcon(name) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", actionIconPaths[name]);
+  svg.append(path);
+  return svg;
+}
+
+function actionButton(label, className, handler, title = label, iconName = null) {
   const button = document.createElement("button");
   button.type = "button";
   button.className = className;
-  button.textContent = label;
   button.title = title;
+  if (iconName) {
+    button.append(actionIcon(iconName));
+  }
+  const text = document.createElement("span");
+  text.textContent = label;
+  button.append(text);
   button.addEventListener("click", handler);
   return button;
 }
+
+function closeJobActionMenus(except = null) {
+  for (const menu of document.querySelectorAll(".job-action-menu[open]")) {
+    if (menu !== except) {
+      menu.removeAttribute("open");
+    }
+  }
+}
+
+function jobActionMenu(job, buttons) {
+  const menu = document.createElement("details");
+  menu.className = "job-action-menu";
+
+  const trigger = document.createElement("summary");
+  trigger.className = "job-action-trigger";
+  trigger.setAttribute("role", "button");
+  trigger.setAttribute("aria-haspopup", "menu");
+  trigger.setAttribute("aria-expanded", "false");
+  trigger.setAttribute("aria-label", `Buka aksi untuk ${job.originalName}`);
+  trigger.title = "Aksi dokumen";
+  trigger.textContent = "•••";
+
+  const panel = document.createElement("div");
+  panel.className = "job-action-panel";
+  panel.setAttribute("role", "menu");
+  for (const button of buttons) {
+    button.setAttribute("role", "menuitem");
+    panel.append(button);
+  }
+
+  menu.addEventListener("toggle", () => {
+    trigger.setAttribute("aria-expanded", String(menu.open));
+    if (menu.open) {
+      closeJobActionMenus(menu);
+    }
+  });
+  panel.addEventListener("click", () => menu.removeAttribute("open"));
+  menu.append(trigger, panel);
+  return menu;
+}
+
+document.addEventListener("click", (event) => {
+  closeJobActionMenus(event.target.closest(".job-action-menu"));
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeJobActionMenus();
+  }
+});
 
 function currentFolder() {
   return virtualFolders.find((folder) => folder.id === activeFolderFilter) ?? null;
@@ -141,10 +243,23 @@ function updateFolderFilterState() {
   elements.manageFolderButton.hidden = !currentFolder();
 }
 
-function setFolderFilter(filter) {
+function setFolderFilter(filter, { syncUploadFolder = true } = {}) {
   activeFolderFilter = filter;
   updateFolderFilterState();
+  if (syncUploadFolder) {
+    if (filter === "unfiled") {
+      elements.uploadFolder.value = "";
+    } else if (virtualFolders.some((folder) => folder.id === filter)) {
+      elements.uploadFolder.value = filter;
+    }
+  }
   renderJobs(latestJobs);
+}
+
+function syncFolderFilterFromUploadDestination() {
+  setFolderFilter(elements.uploadFolder.value || "unfiled", {
+    syncUploadFolder: false,
+  });
 }
 
 function folderFilterButton({ id, name, count, kind = "folder" }) {
@@ -218,7 +333,7 @@ function visibleJobs(jobs) {
 
 async function createVirtualFolder() {
   const result = await Swal.fire({
-    target: document.body,
+    target: getActiveAlertTarget(),
     title: "Buat folder baru",
     text: "Folder hanya mengelompokkan dokumen secara virtual.",
     input: "text",
@@ -261,7 +376,7 @@ async function manageCurrentFolder() {
     return;
   }
   const choice = await Swal.fire({
-    target: document.body,
+    target: getActiveAlertTarget(),
     title: folder.name,
     text: `${folder.jobCount} dokumen berada di folder ini.`,
     icon: "info",
@@ -278,7 +393,7 @@ async function manageCurrentFolder() {
 
   if (choice.isConfirmed) {
     const renamed = await Swal.fire({
-      target: document.body,
+      target: getActiveAlertTarget(),
       title: "Ubah nama folder",
       input: "text",
       inputValue: folder.name,
@@ -335,7 +450,7 @@ async function moveJobToFolder(job) {
     inputOptions[folder.id] = folder.name;
   }
   const result = await Swal.fire({
-    target: document.body,
+    target: getActiveAlertTarget(),
     title: "Pindahkan dokumen",
     text: job.originalName,
     input: "select",
@@ -382,9 +497,13 @@ function renderJobs(jobs) {
     return;
   }
 
-  const rows = filteredJobs.map((job) => {
-    const row = document.createElement("article");
-    row.className = "job-row";
+  const cards = filteredJobs.map((job) => {
+    const card = document.createElement("article");
+    card.className = `job-card ${job.status}`;
+    card.setAttribute("role", "listitem");
+
+    const header = document.createElement("div");
+    header.className = "job-card-header";
 
     const main = document.createElement("div");
     main.className = "job-main";
@@ -439,61 +558,76 @@ function renderJobs(jobs) {
         ? "Menunggu giliran"
         : `${formatDuration(job)}${job.completedAt ? ` · ${formatTime(job.completedAt)}` : ""}`;
 
-    const actions = document.createElement("div");
-    actions.className = "job-actions";
-    actions.append(
-      actionButton(
-        "Pindah",
-        "small-action folder",
-        () => moveJobToFolder(job),
-        "Pindahkan dokumen ke folder virtual",
-      ),
-    );
+    const actionButtons = [];
     if (job.status === "completed") {
+      actionButtons.push(
+        actionButton(
+          "Lihat hasil",
+          "job-menu-action result",
+          () => openResult(job),
+          "Lihat PDF, metadata, dan Markdown",
+          "result",
+        ),
+      );
       if (configuration.aiConfig.configured) {
         const aiRequestPending = pendingAiRequests.has(job.id);
         const askAiButton = actionButton(
           aiRequestPending ? "AI menjawab…" : "Tanya AI",
-          "small-action ai",
+          "job-menu-action ai",
           () => openAskAi(job),
           aiRequestPending
             ? "Jawaban sedang diproses di latar belakang"
             : "Ajukan pertanyaan tentang dokumen kepada AI",
+          "ai",
         );
         askAiButton.setAttribute("aria-busy", String(aiRequestPending));
-        actions.append(askAiButton);
+        actionButtons.push(askAiButton);
       }
-      actions.append(
+      actionButtons.push(
         actionButton(
           "Fetch Data",
-          "small-action api",
+          "job-menu-action api",
           () => openFetchData(job),
           "Lihat ID dan panduan API",
-        ),
-        actionButton(
-          "Lihat hasil",
-          "small-action result",
-          () => openResult(job),
-          "Lihat PDF, metadata, dan Markdown",
+          "api",
         ),
       );
     }
+    actionButtons.push(
+      actionButton(
+        "Pindah",
+        "job-menu-action folder",
+        () => moveJobToFolder(job),
+        "Pindahkan dokumen ke folder virtual",
+        "folder",
+      ),
+    );
     if (job.status === "completed" || job.status === "failed") {
-      actions.append(
+      actionButtons.push(
         actionButton(
           "Hapus",
-          "small-action danger",
+          "job-menu-action danger",
           () => deleteJob(job),
           "Hapus dokumen",
+          "danger",
         ),
       );
     }
 
-    row.append(main, status, time, actions);
-    return row;
+    const actions = document.createElement("div");
+    actions.className = "job-actions";
+    actions.append(jobActionMenu(job, actionButtons));
+
+    const footer = document.createElement("div");
+    footer.className = "job-card-footer";
+    footer.append(status, time);
+
+    header.append(main, actions);
+    card.append(header, footer);
+    return card;
   });
 
-  elements.jobList.replaceChildren(...rows);
+  elements.jobList.replaceChildren(...cards);
 }
 
 function updateStats(stats) {
@@ -503,6 +637,9 @@ function updateStats(stats) {
 }
 
 async function refreshJobs({ quiet = false } = {}) {
+  if (quiet && document.querySelector(".job-action-menu[open]")) {
+    return;
+  }
   if (!quiet) {
     elements.refreshButton.classList.add("loading");
   }
@@ -518,14 +655,7 @@ async function refreshJobs({ quiet = false } = {}) {
     renderFolderControls(foldersBody);
     renderJobs(body.jobs);
     updateStats(body.stats);
-    elements.lastUpdated.textContent = `Diperbarui pukul ${new Intl.DateTimeFormat(
-      "id-ID",
-      {
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      },
-    ).format(new Date())}.`;
+    elements.lastUpdated.textContent = formatLastUpdated();
   } catch (error) {
     if (!quiet) {
       showToast(error.message, "error");
@@ -554,9 +684,8 @@ async function checkHealth() {
 }
 
 async function confirmDeletion({ title, text, confirmButtonText = "Hapus" }) {
-  const target = document.querySelector("dialog[open]") ?? document.body;
   const result = await Swal.fire({
-    target,
+    target: getActiveAlertTarget(),
     title,
     text,
     icon: "warning",
@@ -579,6 +708,7 @@ const applicationFieldLabels = {
   ocrDevice: "perangkat OCR",
   ocrMode: "strategi ekstraksi",
   forceOcr: "paksa OCR",
+  lowMemoryMode: "mode hemat memori",
   ocrLanguage: "bahasa OCR",
   maxFileSizeMb: "batas ukuran PDF",
   aiTimeoutSeconds: "timeout AI",
@@ -592,6 +722,7 @@ const configuration = createConfigurationController({
   formatTime,
   showToast,
   refreshJobs,
+  applicationFieldLabels,
 });
 
 const {
@@ -602,11 +733,13 @@ const {
   importAiModels,
   openConfiguration,
   refreshAiConfig,
+  refreshApplicationConfig,
   revokeApiKey,
   saveAiConfiguration,
   saveApplicationConfig,
   selectConfigTab,
   syncForceOcrAvailability,
+  syncOcrLanguageInformation,
 } = configuration;
 function renderAiResults(results) {
   elements.aiResultCount.textContent = `${results.length} hasil`;
@@ -1038,6 +1171,10 @@ elements.clearSelection.addEventListener("click", () => {
 });
 
 elements.uploadButton.addEventListener("click", uploadSelected);
+elements.uploadFolder.addEventListener(
+  "change",
+  syncFolderFilterFromUploadDestination,
+);
 elements.refreshButton.addEventListener("click", () => refreshJobs());
 elements.createFolderButton.addEventListener("click", createVirtualFolder);
 elements.manageFolderButton.addEventListener("click", manageCurrentFolder);
@@ -1069,6 +1206,7 @@ elements.configTabs.forEach((tab, index) => {
   });
 });
 elements.appOcrMode.addEventListener("change", syncForceOcrAvailability);
+elements.appOcrLanguage.addEventListener("change", syncOcrLanguageInformation);
 elements.saveAppConfig.addEventListener("click", saveApplicationConfig);
 elements.aiImportModels.addEventListener("click", importAiModels);
 elements.addAiTemplate.addEventListener("click", () => {
@@ -1158,7 +1296,7 @@ for (const button of document.querySelectorAll("[data-copy-target]")) {
   });
 }
 
-await Promise.all([checkHealth(), refreshAiConfig()]);
+await Promise.all([checkHealth(), refreshAiConfig(), refreshApplicationConfig()]);
 await refreshJobs();
 refreshTimer = window.setInterval(() => {
   refreshJobs({ quiet: true });

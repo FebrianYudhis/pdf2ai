@@ -32,6 +32,42 @@ function booleanFromEnv(environment, name, fallback) {
   throw new Error(`${name} harus bernilai true atau false.`);
 }
 
+export function buildOcrProcessEnvironment(
+  config,
+  environment = process.env,
+) {
+  const childEnvironment = {
+    ...environment,
+    HF_HUB_DISABLE_SYMLINKS_WARNING: "1",
+  };
+  if (!config.lowMemoryMode) {
+    return childEnvironment;
+  }
+
+  childEnvironment.ODL_LOW_MEMORY_MODE = "1";
+  childEnvironment.ODL_OCR_SCALE ??= "2";
+  childEnvironment.DOCLING_PERF_PAGE_BATCH_SIZE ??= "1";
+  childEnvironment.DOCLING_NUM_THREADS ??= "1";
+  childEnvironment.OMP_NUM_THREADS ??= "1";
+  return childEnvironment;
+}
+
+export function resolveOcrLanguage(engine, language) {
+  const requested = String(language ?? "").trim();
+  if (engine !== "rapidocr") {
+    return requested;
+  }
+
+  const normalized = requested.toLowerCase();
+  if (["id", "idn", "indonesia", "indonesian"].includes(normalized)) {
+    return "english";
+  }
+  if (["en", "eng"].includes(normalized)) {
+    return "english";
+  }
+  return requested;
+}
+
 export function loadConfig({ environment = process.env, appConfigFile } = {}) {
   const applicationConfigFile = resolve(
     appConfigFile ??
@@ -59,6 +95,7 @@ export function loadConfig({ environment = process.env, appConfigFile } = {}) {
     ["ocrDevice", "ODL_OCR_DEVICE"],
     ["ocrMode", environment.ODL_HYBRID !== undefined ? "ODL_HYBRID" : "ODL_HYBRID_MODE"],
     ["forceOcr", "ODL_FORCE_OCR"],
+    ["lowMemoryMode", "ODL_LOW_MEMORY_MODE"],
     ["ocrLanguage", "ODL_OCR_LANG"],
     ["maxFileSizeMb", "ODL_MAX_FILE_SIZE_MB"],
     ["aiTimeoutSeconds", "APP_AI_TIMEOUT_MS"],
@@ -70,6 +107,11 @@ export function loadConfig({ environment = process.env, appConfigFile } = {}) {
     ocrDevice,
     ocrMode: hybrid === "off" ? "off" : hybridMode,
     forceOcr: booleanFromEnv(environment, "ODL_FORCE_OCR", storedSettings.forceOcr),
+    lowMemoryMode: booleanFromEnv(
+      environment,
+      "ODL_LOW_MEMORY_MODE",
+      storedSettings.lowMemoryMode,
+    ),
     ocrLanguage: environment.ODL_OCR_LANG ?? storedSettings.ocrLanguage,
     maxFileSizeMb: numberFromEnv(
       environment,
@@ -96,6 +138,7 @@ export function loadConfig({ environment = process.env, appConfigFile } = {}) {
     hybridMode,
     ocrDevice: effectiveSettings.ocrDevice,
     forceOcr: effectiveSettings.forceOcr,
+    lowMemoryMode: effectiveSettings.lowMemoryMode,
     ocrLanguage: effectiveSettings.ocrLanguage,
     hybridUrl: environment.ODL_HYBRID_URL ?? "http://127.0.0.1:5002",
     hybridTimeout: environment.ODL_HYBRID_TIMEOUT ?? "0",

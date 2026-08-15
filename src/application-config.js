@@ -7,6 +7,7 @@ export const DEFAULT_APPLICATION_SETTINGS = Object.freeze({
   ocrDevice: "cpu",
   ocrMode: "auto",
   forceOcr: false,
+  lowMemoryMode: false,
   ocrLanguage: "english",
   maxFileSizeMb: 25,
   aiTimeoutSeconds: 300,
@@ -40,6 +41,9 @@ export function normalizeApplicationSettings(input = {}) {
   if (typeof settings.forceOcr !== "boolean") {
     throw new Error("Pilihan paksa OCR harus berupa boolean.");
   }
+  if (typeof settings.lowMemoryMode !== "boolean") {
+    throw new Error("Pilihan mode hemat memori harus berupa boolean.");
+  }
   const ocrLanguage = String(settings.ocrLanguage ?? "").trim();
   if (!ocrLanguage || ocrLanguage.length > 64) {
     throw new Error("Bahasa OCR harus berisi 1 sampai 64 karakter.");
@@ -49,6 +53,7 @@ export function normalizeApplicationSettings(input = {}) {
     ocrDevice: settings.ocrDevice,
     ocrMode: settings.ocrMode,
     forceOcr: settings.ocrMode === "off" ? false : settings.forceOcr,
+    lowMemoryMode: settings.lowMemoryMode,
     ocrLanguage,
     maxFileSizeMb: finiteNumber(
       settings.maxFileSizeMb,

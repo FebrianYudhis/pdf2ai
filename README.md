@@ -19,6 +19,8 @@ tidak diperlukan untuk penggunaan dashboard sehari-hari.
 - Upload satu atau beberapa PDF melalui drag-and-drop.
 - Pemrosesan di latar belakang satu per satu dengan mode CPU atau akselerator
   GPU yang kompatibel.
+- Mode hemat memori untuk membatasi batch halaman, antrean internal, dan thread
+  OCR pada mesin dengan RAM terbatas.
 - Antrean dan data dokumen tetap tersedia setelah aplikasi dimulai ulang.
 - Folder virtual persisten untuk mengelompokkan dokumen tanpa memindahkan PDF
   dari lokasi penyimpanan job.
@@ -28,7 +30,10 @@ tidak diperlukan untuk penggunaan dashboard sehari-hari.
 - Salin link API untuk mengambil metadata, PDF, Markdown, dan hasil AI.
 - Unduh PDF atau Markdown langsung dari dashboard.
 - Hapus job beserta PDF, metadata, dan Markdown.
-- Konfirmasi SweetAlert sebelum penghapusan permanen atau pencabutan akses.
+- Riwayat dokumen berbentuk card responsif dengan menu tiga titik dan ikon pada
+  setiap aksi.
+- Konfirmasi SweetAlert sebelum penghapusan permanen atau pencabutan akses;
+  alert tetap tampil di depan ketika modal lain sedang terbuka.
 - HTTP API berbasis antrean untuk integrasi aplikasi lain.
 - API key dapat membaca daftar dan isi folder serta attach/detach dokumen;
   pembuatan, rename, dan penghapusan folder hanya tersedia dari dashboard.
@@ -119,10 +124,13 @@ kode TOTP 6 digit tanpa password.
 3. Pilih folder tujuan, pilih atau tarik satu atau beberapa PDF ke area upload,
    lalu klik
    **Masukkan ke antrean**.
-4. Gunakan filter folder untuk membedakan dokumen. Tombol **Pindah** dapat
-   memindahkan dokumen ke folder lain atau ke **Tanpa folder**.
+4. Gunakan filter folder untuk membedakan dokumen. Folder yang dipilih juga
+   disinkronkan dengan folder tujuan upload. Buka menu tiga titik pada card dan
+   pilih **Pindahkan** untuk memindahkan dokumen ke folder lain atau ke
+   **Tanpa folder**.
 5. Pantau status **Mengantre**, **Memproses**, **Selesai**, atau **Gagal**.
-6. Pada dokumen yang selesai, klik **Lihat hasil** untuk membuka:
+6. Pada dokumen yang selesai, buka menu tiga titik lalu klik **Lihat hasil**
+   untuk membuka:
    - PDF asli;
    - informasi pemrosesan; dan
    - hasil Markdown.
@@ -131,8 +139,8 @@ kode TOTP 6 digit tanpa password.
    Tombol **Tanya AI** akan tersedia setelah konfigurasi valid.
 8. Buka **Konfigurasi → API Key** jika aplikasi lain perlu mengambil data
    PDF2AI. Panduan lengkap tersedia melalui menu **Docs**.
-9. Gunakan tombol **Hapus** hanya jika Anda ingin menghapus PDF dan seluruh
-   hasilnya secara permanen.
+9. Gunakan aksi **Hapus** pada menu tiga titik hanya jika Anda ingin menghapus
+   PDF dan seluruh hasilnya secara permanen.
 
 Browser boleh ditutup setelah upload selesai. Job akan terus diproses oleh
 server dan dimuat kembali ketika aplikasi dimulai ulang.
@@ -143,7 +151,9 @@ Buka **Konfigurasi → Aplikasi** untuk mengubah:
 
 - perangkat OCR: CPU, otomatis, NVIDIA CUDA, Apple MPS, atau Intel XPU;
 - strategi ekstraksi: otomatis, OCR penuh, atau text layer saja;
-- pemaksaan OCR untuk seluruh halaman dan bahasa/model OCR;
+- pemaksaan OCR untuk seluruh halaman;
+- bahasa OCR melalui pilihan model beserta informasi kecocokannya;
+- mode hemat memori untuk mesin dengan RAM terbatas;
 - ukuran maksimum satu PDF;
 - timeout jawaban provider AI; dan
 - durasi sesi login dashboard.
@@ -563,6 +573,7 @@ browser.
 | `ODL_OCR_LANG` | `english` | Bahasa/model OCR |
 | `ODL_OCR_DEVICE` | `cpu` | Device OCR |
 | `ODL_FORCE_OCR` | `false` | Paksa OCR pada seluruh halaman |
+| `ODL_LOW_MEMORY_MODE` | `false` | Batasi Docling ke satu halaman dan satu thread sekaligus |
 | `PYTHON` | otomatis | Override executable Python untuk setup |
 
 Contoh Bash:
@@ -591,6 +602,25 @@ ODL_HYBRID_MODE=full ODL_FORCE_OCR=true npm start
 ```
 
 Mode penuh lebih lambat pada CPU.
+
+### Mode hemat memori
+
+Aktifkan melalui **Konfigurasi → Aplikasi → Mode hemat memori**, lalu restart
+PDF2AI. Mode ini mengatur batch halaman dan thread Docling menjadi `1` untuk
+menekan lonjakan RAM. Antrean internal OCR, layout, dan tabel juga dibatasi
+menjadi satu item, sedangkan skala OCR diturunkan dari 216 DPI ke 144 DPI.
+Pemrosesan dapat berlangsung lebih lama dan teks yang sangat kecil mungkin
+sedikit kurang tajam. Untuk mesin dengan GPU terintegrasi atau RAM terbatas,
+pilih juga perangkat pemrosesan **CPU saja**.
+
+Mode yang sama dapat diaktifkan melalui environment variable:
+
+```bash
+ODL_LOW_MEMORY_MODE=true ODL_OCR_DEVICE=cpu npm start
+```
+
+Skala OCR dapat diubah, misalnya `ODL_OCR_SCALE=1.5` untuk penggunaan RAM yang
+lebih rendah atau `ODL_OCR_SCALE=3` untuk mengembalikan resolusi bawaan.
 
 ## Perintah administrator dan developer
 
@@ -684,6 +714,20 @@ Proses Node.js masih menjalankan kode lama. Hentikan dengan `Ctrl+C`, jalankan
 OCR berbasis CPU dapat memerlukan beberapa menit untuk dokumen kompleks. PDF2AI
 sengaja hanya menjalankan satu job pada satu waktu agar pemakaian RAM dan CPU
 tetap stabil.
+
+### OCR gagal dengan `std::bad_alloc`
+
+Error ini menandakan proses OCR kehabisan memori saat menyiapkan atau memproses
+halaman. Aktifkan **Konfigurasi → Aplikasi → Mode hemat memori**, pilih perangkat
+**CPU saja**, simpan pengaturan, lalu restart PDF2AI. Mode ini memproses satu
+halaman dan satu item antrean internal sekaligus dengan skala OCR 144 DPI.
+
+Jika error masih muncul pada dokumen beresolusi sangat tinggi, turunkan skala
+OCR melalui environment variable lalu jalankan ulang aplikasi:
+
+```bash
+ODL_LOW_MEMORY_MODE=true ODL_OCR_DEVICE=cpu ODL_OCR_SCALE=1.5 npm start
+```
 
 ### Scan tidak menghasilkan teks
 

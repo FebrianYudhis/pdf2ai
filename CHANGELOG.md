@@ -4,6 +4,40 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) dan versi mengikuti
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [1.6.0] - 2026-08-15
+
+### Added
+
+- Opsi **Mode hemat memori** pada konfigurasi aplikasi untuk membatasi batch
+  halaman dan thread Docling, lengkap dengan environment override
+  `ODL_LOW_MEMORY_MODE` dan indikator restart.
+- Pilihan bahasa OCR berbentuk select dengan informasi model dan kecocokan
+  bahasa yang diperbarui langsung saat pilihan berubah.
+
+### Changed
+
+- Redesign riwayat dokumen menjadi grid card responsif dengan status yang lebih
+  mudah dipindai serta menu tiga titik yang dilengkapi ikon untuk setiap aksi.
+- Sinkronisasi dua arah antara filter folder riwayat dan pilihan folder tujuan
+  upload; **Semua dokumen** tidak mengubah tujuan karena bukan folder fisik.
+- Batas ukuran pada area upload kini mengikuti konfigurasi aktif serta
+  menampilkan nilai yang baru berlaku setelah restart atau berasal dari
+  environment override.
+- Menghapus card informasi OCR di area hero agar tampilan utama lebih ringkas.
+- Menghapus catatan privasi di bagian bawah panel upload.
+- Memindahkan status kesiapan API dan OCR dari navbar ke card pada area utama.
+- Waktu pembaruan riwayat kini menyertakan tanggal lengkap dan memakai pemisah
+  waktu titik dua.
+
+### Fixed
+
+- Toast dan SweetAlert kini ditempatkan pada modal aktif agar selalu tampil di
+  depan, bukan di balik backdrop dialog.
+- Mode hemat memori kini membatasi antrean serta batch internal OCR, layout,
+  dan tabel menjadi satu item, lalu memakai skala OCR 144 DPI.
+
 ## [1.5.0] - 2026-08-10
 
 ### Changed

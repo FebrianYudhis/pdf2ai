@@ -23,6 +23,25 @@ export function formatTime(value) {
   }).format(new Date(value));
 }
 
+export function formatLastUpdated(value = new Date()) {
+  const date = new Date(value);
+  const formattedDate = new Intl.DateTimeFormat("id-ID", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(date);
+  const formattedTime = new Intl.DateTimeFormat("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  })
+    .format(date)
+    .replace(/\./g, ":");
+
+  return `Diperbarui pukul ${formattedDate} - ${formattedTime}.`;
+}
+
 export function formatDuration(job) {
   if (!job.startedAt) {
     return "Menunggu giliran";

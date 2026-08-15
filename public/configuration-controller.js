@@ -5,6 +5,7 @@ export function createConfigurationController({
   formatTime,
   showToast,
   refreshJobs,
+  applicationFieldLabels,
 }) {
   let apiKeyConfigured = false;
   let importedAiModels = [];
@@ -44,6 +45,34 @@ export function createConfigurationController({
       elements.appForceOcr.checked = false;
     }
   }
+
+  const ocrLanguageInformation = {
+    indonesia:
+      "Bahasa Indonesia memakai model English RapidOCR yang kompatibel dengan aksara Latin dan mempertahankan spasi antarkata.",
+    english:
+      "Gunakan untuk dokumen berbahasa Inggris dan teks umum beraksara Latin.",
+    chinese:
+      "Gunakan hanya untuk dokumen Chinese. Model ini dapat menghilangkan spasi jika dipakai pada teks Latin.",
+  };
+
+  function syncOcrLanguageInformation() {
+    elements.appOcrLanguageHelp.textContent =
+      ocrLanguageInformation[elements.appOcrLanguage.value] ??
+      "Pilihan ini diteruskan ke engine OCR saat aplikasi direstart.";
+  }
+
+  function syncUploadSizeInformation(result) {
+    const configuredSize = result.settings.maxFileSizeMb;
+    const activeSize = result.activeSettings?.maxFileSizeMb ?? configuredSize;
+    const overridden = (result.environmentOverrides ?? []).some(
+      ({ field }) => field === "maxFileSizeMb",
+    );
+    elements.uploadSizeLimit.textContent = overridden
+      ? `PDF · maksimum ${activeSize} MB per file · diatur lewat environment`
+      : configuredSize !== activeSize
+        ? `PDF · maksimum ${activeSize} MB per file · ${configuredSize} MB setelah restart`
+        : `PDF · maksimum ${activeSize} MB per file`;
+  }
   
   function renderApplicationConfig(result) {
     applicationConfig = result;
@@ -51,11 +80,14 @@ export function createConfigurationController({
     elements.appOcrDevice.value = settings.ocrDevice;
     elements.appOcrMode.value = settings.ocrMode;
     elements.appForceOcr.checked = settings.forceOcr;
+    elements.appLowMemoryMode.checked = settings.lowMemoryMode;
     elements.appOcrLanguage.value = settings.ocrLanguage;
     elements.appMaxFileSize.value = settings.maxFileSizeMb;
     elements.appAiTimeout.value = settings.aiTimeoutSeconds;
     elements.appSessionHours.value = settings.sessionHours;
     syncForceOcrAvailability();
+    syncOcrLanguageInformation();
+    syncUploadSizeInformation(result);
   
     elements.appRestartNotice.hidden = !result.restartRequired;
     const hasOverrides = (result.environmentOverrides ?? []).length > 0;
@@ -102,6 +134,7 @@ export function createConfigurationController({
       ocrDevice: elements.appOcrDevice.value,
       ocrMode: elements.appOcrMode.value,
       forceOcr: elements.appForceOcr.checked,
+      lowMemoryMode: elements.appLowMemoryMode.checked,
       ocrLanguage: elements.appOcrLanguage.value.trim(),
       maxFileSizeMb: Number(elements.appMaxFileSize.value),
       aiTimeoutSeconds: Number(elements.appAiTimeout.value),
@@ -491,11 +524,12 @@ export function createConfigurationController({
     importAiModels,
     openConfiguration,
     refreshAiConfig,
+    refreshApplicationConfig,
     revokeApiKey,
     saveAiConfiguration,
     saveApplicationConfig,
     selectConfigTab,
     syncForceOcrAvailability,
+    syncOcrLanguageInformation,
   };
 }
-

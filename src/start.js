@@ -7,6 +7,10 @@ import {
   loadConfig,
   startServer,
 } from "./server.js";
+import {
+  buildOcrProcessEnvironment,
+  resolveOcrLanguage,
+} from "./server-config.js";
 
 const root = resolve(import.meta.dirname, "..");
 const config = loadConfig();
@@ -52,11 +56,12 @@ function startOcrProcess() {
 
   const url = new URL(config.hybridUrl);
   const ocrEngine = process.env.ODL_OCR_ENGINE ?? "rapidocr";
-  const ocrLanguage = config.ocrLanguage ??
-    (ocrEngine === "rapidocr" ? "english" : "id,en");
+  const ocrLanguage = resolveOcrLanguage(
+    ocrEngine,
+    config.ocrLanguage ?? (ocrEngine === "rapidocr" ? "english" : "id,en"),
+  );
   const args = [
-    "-m",
-    "opendataloader_pdf.hybrid_server",
+    join(root, "scripts", "hybrid-server.py"),
     "--host",
     url.hostname,
     "--port",
@@ -75,14 +80,12 @@ function startOcrProcess() {
 
   console.log(
     `Menyalakan backend OCR (engine=${ocrEngine}, ` +
-      `device=${config.ocrDevice ?? "cpu"}, force=${forceOcr})...`,
+      `device=${config.ocrDevice ?? "cpu"}, force=${forceOcr}, ` +
+      `bahasa=${ocrLanguage}, hemat-memori=${config.lowMemoryMode === true})...`,
   );
   const child = spawn(python, args, {
     cwd: root,
-    env: {
-      ...process.env,
-      HF_HUB_DISABLE_SYMLINKS_WARNING: "1",
-    },
+    env: buildOcrProcessEnvironment(config),
     stdio: "inherit",
     windowsHide: true,
   });

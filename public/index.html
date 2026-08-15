@@ -36,10 +36,6 @@
         </button>
 
         <div class="topbar-actions" id="topbar-actions">
-          <div class="service-status" id="service-status" role="status">
-            <span class="status-dot" aria-hidden="true"></span>
-            <span id="service-status-text">Memeriksa mesin…</span>
-          </div>
           <a class="logout-button nav-action" href="/docs">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v16H6.5A2.5 2.5 0 0 0 4 21.5v-16Zm16 0A2.5 2.5 0 0 0 17.5 3H13v16h4.5a2.5 2.5 0 0 1 2.5 2.5v-16Z" /></svg>
             <span>Docs</span>
@@ -66,11 +62,19 @@
             siap untuk RAG, pencarian, dan automasi.
           </p>
         </div>
-        <div class="pipeline-note" aria-label="Informasi pemrosesan">
-          <span class="pipeline-number">AI</span>
+        <div
+          class="service-card"
+          id="service-status"
+          role="status"
+          aria-live="polite"
+          aria-label="Status layanan"
+        >
+          <span class="service-card-indicator" aria-hidden="true">
+            <span class="status-dot"></span>
+          </span>
           <div>
-            <strong>OCR + Markdown</strong>
-            <small>CPU stabil atau akselerator sesuai konfigurasi.</small>
+            <strong id="service-status-text">Memeriksa mesin…</strong>
+            <small>Status API dan OCR diperiksa otomatis.</small>
           </div>
         </div>
       </section>
@@ -116,7 +120,7 @@
             <span class="upload-icon" aria-hidden="true">PDF</span>
             <strong>Tarik file ke area ini</strong>
             <span>atau klik untuk memilih dari komputer</span>
-            <small>PDF · maksimum 25 MB per file</small>
+            <small id="upload-size-limit" aria-live="polite">PDF · memuat batas ukuran…</small>
           </label>
 
           <div class="selection" id="selection" hidden>
@@ -144,13 +148,6 @@
             <span aria-hidden="true">→</span>
           </button>
 
-          <div class="privacy-note">
-            <span aria-hidden="true"></span>
-            <p>
-              <strong>Data tetap di mesin Anda.</strong>
-              Proses berlanjut meski halaman ditutup.
-            </p>
-          </div>
         </aside>
 
         <section class="jobs-panel">
@@ -183,14 +180,7 @@
             </div>
           </div>
 
-          <div class="job-table-head" aria-hidden="true">
-            <span>Dokumen</span>
-            <span>Status</span>
-            <span>Waktu</span>
-            <span>Aksi</span>
-          </div>
-
-          <div class="job-list" id="job-list" aria-live="polite">
+          <div class="job-list" id="job-list" role="list" aria-live="polite">
             <div class="empty-state" id="empty-state">
               <span class="empty-mark" aria-hidden="true">PDF</span>
               <h3 id="empty-state-title">Belum ada dokumen</h3>
@@ -501,11 +491,12 @@
                     <label class="form-field"><span>Strategi ekstraksi</span><select id="app-ocr-mode"><option value="auto">Otomatis — seimbang</option><option value="full">OCR penuh — kualitas scan</option><option value="off">Text layer saja — PDF digital</option></select><small>Mode penuh lebih akurat untuk scan, tetapi menggunakan waktu dan resource lebih besar.</small></label>
                   </div>
                   <label class="toggle-setting" id="app-force-ocr-wrapper"><input id="app-force-ocr" type="checkbox" /><span class="toggle-control" aria-hidden="true"></span><span><strong>Paksa OCR pada seluruh halaman</strong><small>Gunakan ketika text layer bawaan PDF rusak atau tidak dapat dipercaya.</small></span></label>
+                  <label class="toggle-setting"><input id="app-low-memory-mode" type="checkbox" /><span class="toggle-control" aria-hidden="true"></span><span><strong>Mode hemat memori</strong><small>Proses satu halaman dan satu thread sekaligus. Lebih stabil untuk RAM terbatas, tetapi OCR dapat berjalan lebih lama.</small></span></label>
                 </section>
 
                 <section class="settings-card">
                   <div class="settings-card-heading"><span class="settings-icon">02</span><div><h4>OCR &amp; unggahan</h4><p>Model bahasa dan batas input.</p></div></div>
-                  <div class="settings-fields"><label class="form-field"><span>Bahasa/model OCR</span><input id="app-ocr-language" type="text" maxlength="64" placeholder="english" /><small>RapidOCR bawaan menggunakan <code>english</code>.</small></label><label class="form-field"><span>Ukuran PDF maksimum</span><div class="input-suffix"><input id="app-max-file-size" type="number" min="1" max="500" step="1" /><span>MB</span></div><small>Rentang 1–500 MB per dokumen.</small></label></div>
+                  <div class="settings-fields"><label class="form-field"><span>Bahasa/model OCR</span><select id="app-ocr-language"><option value="indonesia">Bahasa Indonesia — model English</option><option value="english">English — model English</option><option value="chinese">中文 / Chinese — model Chinese</option></select><small id="app-ocr-language-help" aria-live="polite">Bahasa Indonesia memakai model English RapidOCR yang kompatibel dengan aksara Latin dan mempertahankan spasi antarkata.</small></label><label class="form-field"><span>Ukuran PDF maksimum</span><div class="input-suffix"><input id="app-max-file-size" type="number" min="1" max="500" step="1" /><span>MB</span></div><small>Rentang 1–500 MB per dokumen.</small></label></div>
                 </section>
 
                 <section class="settings-card">

@@ -7,6 +7,10 @@ import { join } from "node:path";
 import { generateSync } from "otplib";
 
 import { saveApplicationSettings } from "../src/application-config.js";
+import {
+  buildOcrProcessEnvironment,
+  resolveOcrLanguage,
+} from "../src/server-config.js";
 import { buildServer, loadConfig } from "../src/server.js";
 
 function testConfig() {
@@ -62,6 +66,7 @@ test("konfigurasi aplikasi persisten dimuat saat startup", async () => {
     ocrDevice: "auto",
     ocrMode: "full",
     forceOcr: true,
+    lowMemoryMode: true,
     ocrLanguage: "english",
     maxFileSizeMb: 64,
     aiTimeoutSeconds: 420,
@@ -72,6 +77,7 @@ test("konfigurasi aplikasi persisten dimuat saat startup", async () => {
   assert.equal(config.ocrDevice, "auto");
   assert.equal(config.hybridMode, "full");
   assert.equal(config.forceOcr, true);
+  assert.equal(config.lowMemoryMode, true);
   assert.equal(config.maxFileSizeMb, 64);
   assert.equal(config.aiTimeoutMs, 420_000);
   assert.equal(config.sessionHours, 36);
@@ -86,12 +92,14 @@ test("konfigurasi aplikasi disimpan dan menandai perubahan yang perlu restart", 
   assert.equal(initial.statusCode, 200);
   assert.equal(initial.json().settings.ocrDevice, "cpu");
   assert.equal(initial.json().settings.ocrMode, "off");
+  assert.equal(initial.json().settings.lowMemoryMode, false);
   assert.equal(initial.json().restartRequired, false);
 
   const settings = {
     ocrDevice: "cuda",
     ocrMode: "full",
     forceOcr: true,
+    lowMemoryMode: true,
     ocrLanguage: "english",
     maxFileSizeMb: 80,
     aiTimeoutSeconds: 600,
@@ -106,6 +114,7 @@ test("konfigurasi aplikasi disimpan dan menandai perubahan yang perlu restart", 
   assert.deepEqual(saved.json().settings, settings);
   assert.equal(saved.json().restartRequired, true);
   assert.ok(saved.json().restartFields.includes("ocrDevice"));
+  assert.ok(saved.json().restartFields.includes("lowMemoryMode"));
   assert.ok(saved.json().restartFields.includes("maxFileSizeMb"));
 
   const document = JSON.parse(
@@ -120,6 +129,28 @@ test("konfigurasi aplikasi disimpan dan menandai perubahan yang perlu restart", 
     payload: { ...settings, ocrDevice: "gpu-ajaib" },
   });
   assert.equal(invalid.statusCode, 400);
+});
+
+test("mode hemat memori membatasi batch dan thread backend OCR", () => {
+  const environment = buildOcrProcessEnvironment(
+    { lowMemoryMode: true },
+    { EXISTING: "tetap", DOCLING_NUM_THREADS: "2" },
+  );
+
+  assert.equal(environment.EXISTING, "tetap");
+  assert.equal(environment.ODL_LOW_MEMORY_MODE, "1");
+  assert.equal(environment.ODL_OCR_SCALE, "2");
+  assert.equal(environment.DOCLING_PERF_PAGE_BATCH_SIZE, "1");
+  assert.equal(environment.DOCLING_NUM_THREADS, "2");
+  assert.equal(environment.OMP_NUM_THREADS, "1");
+  assert.equal(environment.HF_HUB_DISABLE_SYMLINKS_WARNING, "1");
+});
+
+test("bahasa Indonesia memakai model English RapidOCR", () => {
+  assert.equal(resolveOcrLanguage("rapidocr", "indonesia"), "english");
+  assert.equal(resolveOcrLanguage("rapidocr", "id"), "english");
+  assert.equal(resolveOcrLanguage("rapidocr", "en"), "english");
+  assert.equal(resolveOcrLanguage("tesseract", "id,en"), "id,en");
 });
 
 function multipartPdf(
@@ -316,6 +347,7 @@ test("dashboard, sub-navbar docs, Scalar API reference, dan health tersedia", as
     appUtils,
     configurationController,
     mobileMenu,
+    mainStyles,
     authStyles,
     docsStyles,
     sweetAlert,
@@ -335,6 +367,7 @@ test("dashboard, sub-navbar docs, Scalar API reference, dan health tersedia", as
     app.inject({ method: "GET", url: "/app-utils.js" }),
     app.inject({ method: "GET", url: "/configuration-controller.js" }),
     app.inject({ method: "GET", url: "/mobile-menu.js" }),
+    app.inject({ method: "GET", url: "/styles.css" }),
     app.inject({ method: "GET", url: "/styles-auth.css" }),
     app.inject({ method: "GET", url: "/styles-docs.css" }),
     app.inject({ method: "GET", url: "/vendor/sweetalert2.esm.all.min.js" }),
@@ -343,6 +376,13 @@ test("dashboard, sub-navbar docs, Scalar API reference, dan health tersedia", as
   assert.equal(page.statusCode, 200);
   assert.match(page.headers["content-type"], /^text\/html/);
   assert.match(page.body, /PDF siap untuk AI\./);
+  assert.match(page.body, /class="service-card"/);
+  assert.match(page.body, /id="service-status-text">Memeriksa mesin/);
+  assert.match(page.body, /Status API dan OCR diperiksa otomatis/);
+  assert.doesNotMatch(page.body, /OCR \+ Markdown/);
+  assert.doesNotMatch(page.body, /CPU stabil atau akselerator/);
+  assert.doesNotMatch(page.body, /Data tetap di mesin Anda/);
+  assert.doesNotMatch(page.body, /Proses berlanjut meski halaman ditutup/);
   assert.match(page.body, /Fetch Data/);
   assert.match(page.body, /data-result-tab="pdf"/);
   assert.match(page.body, /data-result-tab="metadata"/);
@@ -353,10 +393,16 @@ test("dashboard, sub-navbar docs, Scalar API reference, dan health tersedia", as
   assert.match(page.body, /data-config-tab="app"/);
   assert.match(page.body, /data-config-tab="ai"/);
   assert.match(page.body, /data-config-tab="api"/);
+  assert.match(page.body, /<select id="app-ocr-language">/);
+  assert.match(page.body, /Bahasa Indonesia — model English/);
+  assert.match(page.body, /id="app-ocr-language-help"/);
   assert.match(page.body, /id="fetch-ai-results-url"/);
   assert.match(page.body, /id="mobile-menu-button"/);
   assert.match(page.body, /aria-controls="topbar-actions"/);
   assert.match(page.body, /id="ask-ai-dialog"/);
+  assert.match(page.body, /id="job-list" role="list"/);
+  assert.match(page.body, /id="upload-size-limit"/);
+  assert.doesNotMatch(page.body, /maksimum 25 MB per file/);
   assert.equal(docs.statusCode, 200);
   assert.match(docs.headers["content-type"], /^text\/html/);
   assert.match(docs.body, /Integrasikan PDF2AI\./);
@@ -397,6 +443,20 @@ test("dashboard, sub-navbar docs, Scalar API reference, dan health tersedia", as
   assert.match(appScript.body, /Swal\.fire/);
   assert.match(appScript.body, /pendingAiRequests/);
   assert.match(appScript.body, /AI gagal menjawab/);
+  assert.match(appScript.body, /formatLastUpdated/);
+  assert.match(appScript.body, /getActiveAlertTarget/);
+  assert.match(appScript.body, /modal-toast-region/);
+  assert.match(mainStyles.body, /\.modal-toast-region/);
+  assert.match(appScript.body, /jobActionMenu/);
+  assert.match(appScript.body, /job-action-trigger/);
+  assert.match(appScript.body, /actionIconPaths/);
+  assert.match(appScript.body, /createElementNS/);
+  assert.match(appScript.body, /aria-haspopup/);
+  assert.match(appScript.body, /\.job-action-menu\[open\]/);
+  assert.match(appScript.body, /syncFolderFilterFromUploadDestination/);
+  assert.match(appScript.body, /syncUploadFolder/);
+  assert.match(configurationController.body, /syncUploadSizeInformation/);
+  assert.match(configurationController.body, /MB setelah restart/);
   for (const moduleAsset of [
     appElements,
     appUtils,
@@ -406,7 +466,7 @@ test("dashboard, sub-navbar docs, Scalar API reference, dan health tersedia", as
     assert.equal(moduleAsset.statusCode, 200);
     assert.match(moduleAsset.headers["content-type"], /javascript/);
   }
-  for (const styleAsset of [authStyles, docsStyles]) {
+  for (const styleAsset of [mainStyles, authStyles, docsStyles]) {
     assert.equal(styleAsset.statusCode, 200);
     assert.match(styleAsset.headers["content-type"], /^text\/css/);
   }
