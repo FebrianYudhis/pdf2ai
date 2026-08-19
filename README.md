@@ -22,6 +22,8 @@ tidak diperlukan untuk penggunaan dashboard sehari-hari.
 - Mode hemat memori untuk membatasi batch halaman, antrean internal, dan thread
   OCR pada mesin dengan RAM terbatas.
 - Antrean dan data dokumen tetap tersedia setelah aplikasi dimulai ulang.
+- Jeda dan lanjutkan antrean dokumen secara persisten (status jeda tetap terjaga saat server restart).
+- Batalkan pemrosesan dokumen yang masih di antrean maupun yang sedang berjalan.
 - Folder virtual persisten untuk mengelompokkan dokumen tanpa memindahkan PDF
   dari lokasi penyimpanan job.
 - OCR scan melalui Docling, RapidOCR, dan ONNX Runtime.
@@ -129,18 +131,20 @@ kode TOTP 6 digit tanpa password.
    pilih **Pindahkan** untuk memindahkan dokumen ke folder lain atau ke
    **Tanpa folder**.
 5. Pantau status **Mengantre**, **Memproses**, **Selesai**, atau **Gagal**.
-6. Pada dokumen yang selesai, buka menu tiga titik lalu klik **Lihat hasil**
+6. Gunakan tombol **Jeda antrean** / **Lanjutkan antrean** di bagian atas riwayat dokumen untuk mengontrol jalannya antrean secara manual.
+7. Pada menu tiga titik kartu dokumen yang sedang mengantre atau diproses, gunakan **Batalkan** untuk menghentikan pemrosesan dokumen tersebut.
+8. Pada dokumen yang selesai, buka menu tiga titik lalu klik **Lihat hasil**
    untuk membuka:
    - PDF asli;
    - informasi pemrosesan; dan
    - hasil Markdown.
-7. Buka **Konfigurasi → AI** untuk menghubungkan provider, memeriksa token,
+9. Buka **Konfigurasi → AI** untuk menghubungkan provider, memeriksa token,
    mengimpor model, memilih model default, dan membuat template pertanyaan.
    Tombol **Tanya AI** akan tersedia setelah konfigurasi valid.
-8. Buka **Konfigurasi → API Key** jika aplikasi lain perlu mengambil data
-   PDF2AI. Panduan lengkap tersedia melalui menu **Docs**.
-9. Gunakan aksi **Hapus** pada menu tiga titik hanya jika Anda ingin menghapus
-   PDF dan seluruh hasilnya secara permanen.
+10. Buka **Konfigurasi → API Key** jika aplikasi lain perlu mengambil data
+    PDF2AI. Panduan lengkap tersedia melalui menu **Docs**.
+11. Gunakan aksi **Hapus** pada menu tiga titik hanya jika Anda ingin menghapus
+    PDF dan seluruh hasilnya secara permanen.
 
 Browser boleh ditutup setelah upload selesai. Job akan terus diproses oleh
 server dan dimuat kembali ketika aplikasi dimulai ulang.
@@ -235,9 +239,12 @@ Endpoint `/v1/health` tetap tersedia tanpa autentikasi untuk health check.
 | `POST` | `/v1/folders` | Membuat folder virtual (dashboard saja) |
 | `PATCH` | `/v1/folders/:id` | Mengubah nama folder (dashboard saja) |
 | `DELETE` | `/v1/folders/:id` | Menghapus folder (dashboard saja) |
+| `POST` | `/v1/queue/pause` | Menjeda antrean dokumen |
+| `POST` | `/v1/queue/resume` | Melanjutkan kembali antrean dokumen |
 | `POST` | `/v1/jobs` | Membuat job background |
 | `GET` | `/v1/jobs` | Daftar job dan statistik |
 | `GET` | `/v1/jobs/:id` | Metadata, status, dan URL resource job |
+| `POST` | `/v1/jobs/:id/cancel` | Membatalkan job antre atau sedang diproses |
 | `PATCH` | `/v1/jobs/:id` | Memindahkan job ke folder virtual |
 | `GET` | `/v1/jobs/:id/pdf` | PDF asli |
 | `GET` | `/v1/jobs/:id/markdown` | Markdown hasil ekstraksi |

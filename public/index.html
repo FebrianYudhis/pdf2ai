@@ -157,15 +157,41 @@
               <h2>Riwayat dokumen</h2>
               <p id="last-updated">Status diperbarui otomatis.</p>
             </div>
-            <button
-              class="icon-button"
-              id="refresh-button"
-              type="button"
-              title="Muat ulang"
-              aria-label="Muat ulang daftar dokumen"
-            >
-              <span aria-hidden="true">↻</span>
-            </button>
+            <div class="jobs-heading-actions">
+              <button
+                class="queue-control-button"
+                id="queue-toggle-button"
+                type="button"
+                title="Jeda antrean dokumen"
+                aria-label="Jeda atau lanjutkan antrean"
+              >
+                <svg class="queue-icon-pause" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M6 4h4v16H6V4Zm8 0h4v16h-4V4Z" />
+                </svg>
+                <svg class="queue-icon-resume" viewBox="0 0 24 24" aria-hidden="true" hidden>
+                  <path d="m8 5 11 7-11 7V5Z" />
+                </svg>
+                <span id="queue-toggle-label">Jeda antrean</span>
+              </button>
+              <button
+                class="icon-button"
+                id="refresh-button"
+                type="button"
+                title="Muat ulang"
+                aria-label="Muat ulang daftar dokumen"
+              >
+                <span aria-hidden="true">↻</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="queue-paused-banner" id="queue-paused-banner" hidden role="alert">
+            <span class="paused-indicator-icon" aria-hidden="true">⏸</span>
+            <div class="paused-banner-text">
+              <strong>Antrean dijeda</strong>
+              <span>Dokumen berikutnya tidak akan diproses otomatis sampai antrean dilanjutkan.</span>
+            </div>
+            <button class="paused-resume-button" id="paused-resume-action" type="button">Lanjutkan</button>
           </div>
 
           <div class="folder-toolbar">
@@ -187,6 +213,19 @@
               <p id="empty-state-copy">PDF yang Anda unggah akan dipantau dari halaman ini.</p>
             </div>
           </div>
+
+          <nav class="pagination-nav" id="pagination-nav" aria-label="Navigasi halaman dokumen" hidden>
+            <span class="pagination-info" id="pagination-info">Menampilkan 1–6 dari 0 dokumen</span>
+            <div class="pagination-controls">
+              <button class="pagination-button" id="pagination-prev" type="button" aria-label="Halaman sebelumnya">
+                ← Sebelumnya
+              </button>
+              <div class="pagination-pages" id="pagination-pages"></div>
+              <button class="pagination-button" id="pagination-next" type="button" aria-label="Halaman berikutnya">
+                Selanjutnya →
+              </button>
+            </div>
+          </nav>
         </section>
       </section>
     </main>

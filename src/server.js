@@ -838,6 +838,16 @@ export async function buildServer({
     return reply.code(202).send({ job: serializeJob(job, folders) });
   });
 
+  app.post("/v1/queue/pause", async () => {
+    const stats = await jobs.pause();
+    return { ok: true, paused: true, stats };
+  });
+
+  app.post("/v1/queue/resume", async () => {
+    const stats = await jobs.resume();
+    return { ok: true, paused: false, stats };
+  });
+
   app.get("/v1/jobs", async () => ({
     jobs: jobs.list().map((job) => serializeJob(job, folders)),
     stats: jobs.stats(),
@@ -846,6 +856,11 @@ export async function buildServer({
   app.get("/v1/jobs/:id", async (request) => ({
     job: serializeJob(jobs.get(request.params.id), folders),
   }));
+
+  app.post("/v1/jobs/:id/cancel", async (request) => {
+    const job = await jobs.cancel(request.params.id);
+    return { job: serializeJob(job, folders) };
+  });
 
   app.patch(
     "/v1/jobs/:id",

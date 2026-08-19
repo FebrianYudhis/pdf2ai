@@ -63,9 +63,11 @@
           <a href="#health"><span class="nav-method get">GET</span> Health</a>
           <a href="#ai-models"><span class="nav-method get">GET</span> Model AI</a>
           <a href="#folders"><span class="nav-method get">GET</span> Isi folder</a>
+          <a href="#queue-control"><span class="nav-method post">POST</span> Jeda &amp; Lanjut</a>
           <a href="#create-job"><span class="nav-method post">POST</span> Buat job</a>
           <a href="#list-jobs"><span class="nav-method get">GET</span> Daftar job</a>
           <a href="#job-status"><span class="nav-method get">GET</span> Status job</a>
+          <a href="#cancel-job"><span class="nav-method post">POST</span> Batalkan job</a>
           <a href="#job-files"><span class="nav-method get">GET</span> Ambil hasil</a>
           <a href="#ask-ai-api"><span class="nav-method post">POST</span> Tanya AI</a>
           <a href="#list-ai-results"><span class="nav-method get">GET</span> Daftar hasil AI</a>
@@ -236,7 +238,8 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
     "queued": 0,
     "processing": 1,
     "completed": 8,
-    "failed": 0
+    "failed": 0,
+    "paused": false
   }
 }</pre>
           </details>
@@ -343,6 +346,46 @@ curl -X PATCH {{BASE_URL}}/v1/jobs/JOB_ID \
       "jobUrl": "/v1/jobs/JOB_ID"
     }
   ]
+}</pre>
+          </details>
+        </section>
+
+        <section class="docs-section endpoint-section" id="queue-control">
+          <div class="endpoint-title stacked-title">
+            <div><span class="method-badge post">POST</span><code>/v1/queue/pause</code></div>
+            <div><span class="method-badge post">POST</span><code>/v1/queue/resume</code></div>
+            <span class="auth-badge">API KEY</span>
+          </div>
+          <p>
+            Mengontrol antrean pemrosesan dokumen. Saat antrean dijeda (<code>pause</code>), dokumen yang sedang berjalan diselesaikan terlebih dahulu, namun dokumen di antrean tidak diproses otomatis sampai dilanjutkan (<code>resume</code>). Status jeda disimpan secara persisten di disk.
+          </p>
+
+          <div class="code-sample docs-code-sample">
+            <div class="code-sample-header">
+              <span>cURL · Jeda dan Lanjutkan</span>
+              <button class="code-copy-button" type="button" data-copy="#queue-code">Salin</button>
+            </div>
+            <pre id="queue-code" data-code tabindex="0"># Jeda pemrosesan antrean
+curl -X POST {{BASE_URL}}/v1/queue/pause \
+  -H "X-API-Key: $PDF2AI_API_KEY"
+
+# Lanjutkan pemrosesan antrean
+curl -X POST {{BASE_URL}}/v1/queue/resume \
+  -H "X-API-Key: $PDF2AI_API_KEY"</pre>
+          </div>
+
+          <details class="response-details" open>
+            <summary>Bentuk response · 200 OK</summary>
+            <pre>{
+  "ok": true,
+  "paused": true,
+  "stats": {
+    "queued": 2,
+    "processing": 0,
+    "completed": 8,
+    "failed": 0,
+    "paused": true
+  }
 }</pre>
           </details>
         </section>
@@ -457,7 +500,8 @@ const { job } = await response.json();</pre>
     "queued": 0,
     "processing": 0,
     "completed": 8,
-    "failed": 1
+    "failed": 1,
+    "paused": false
   }
 }</pre>
           </details>
@@ -517,6 +561,48 @@ const { job } = await response.json();</pre>
             digunakan untuk Tanya AI.
             <code>aiResultsUrl</code> selalu tersedia dan mengarah ke koleksi
             hasil AI milik job. Koleksi dapat kosong jika Tanya AI belum pernah dijalankan.
+          </p>
+        </section>
+
+        <section class="docs-section endpoint-section" id="cancel-job">
+          <div class="endpoint-title">
+            <span class="method-badge post">POST</span>
+            <code>/v1/jobs/:id/cancel</code>
+            <span class="auth-badge">API KEY</span>
+          </div>
+          <p>
+            Membatalkan job yang masih berada dalam antrean (<code>queued</code>) atau yang sedang berjalan (<code>processing</code>). Dokumen akan diubah statusnya menjadi <code>failed</code> dengan pesan error <code>"Dibatalkan oleh pengguna."</code>.
+          </p>
+
+          <div class="code-sample docs-code-sample">
+            <div class="code-sample-header">
+              <span>cURL</span>
+              <button class="code-copy-button" type="button" data-copy="#cancel-job-code">Salin</button>
+            </div>
+            <pre id="cancel-job-code" data-code tabindex="0">curl -X POST {{BASE_URL}}/v1/jobs/JOB_ID/cancel \
+  -H "X-API-Key: $PDF2AI_API_KEY"</pre>
+          </div>
+
+          <details class="response-details" open>
+            <summary>Contoh response · 200 OK</summary>
+            <pre>{
+  "job": {
+    "id": "JOB_ID",
+    "originalName": "document.pdf",
+    "size": 1048576,
+    "status": "failed",
+    "createdAt": "2026-08-01T08:00:00.000Z",
+    "startedAt": "2026-08-01T08:00:05.000Z",
+    "completedAt": "2026-08-01T08:00:10.000Z",
+    "error": "Dibatalkan oleh pengguna.",
+    "jobUrl": "/v1/jobs/JOB_ID",
+    "pdfUrl": "/v1/jobs/JOB_ID/pdf",
+    "markdownUrl": null
+  }
+}</pre>
+          </details>
+          <p class="response-note">
+            Job yang sudah berstatus <code>completed</code> atau <code>failed</code> tidak dapat dibatalkan dan akan mengembalikan status <strong>409 Conflict</strong>.
           </p>
         </section>
 

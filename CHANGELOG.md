@@ -6,6 +6,31 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-08-19
+
+### Added
+
+- Fitur **Jeda & Lanjutkan Antrean (Pause & Resume)** untuk menahan atau melanjutkan pemrosesan dokumen secara manual dari dashboard maupun REST API.
+- Persistensi status jeda antrean ke disk (`.queue-state.json`), menjaga status antrean tetap terjeda saat server dimatikan atau di-restart.
+- Banner notifikasi **"Antrean dijeda"** di dashboard dengan tombol aksi cepat untuk melanjutkan antrean.
+- Fitur **Batalkan Dokumen (Cancel Job)** untuk membatalkan proses dokumen yang masih mengantre (`queued`) maupun yang sedang diekstrak (`processing`), dengan status akhir diubah menjadi `failed` ("Dibatalkan oleh pengguna.").
+- Endpoint REST API baru:
+  - `POST /v1/queue/pause` untuk menjeda pemrosesan antrean.
+  - `POST /v1/queue/resume` untuk melanjutkan kembali pemrosesan antrean.
+  - `POST /v1/jobs/:id/cancel` untuk membatalkan dokumen tertentu.
+- Informasi status `paused: boolean` pada objek `stats` di endpoint `GET /v1/jobs` dan `GET /v1/health`.
+- Fitur **Paginasi Riwayat Dokumen** dengan batas 6 item per halaman, lengkap dengan kontrol navigasi halaman (Sebelumnya, Nomor Halaman, Selanjutnya) dan informasi rentang dokumen yang otomatis aktif saat dokumen melebihi 6 item.
+- Dokumentasi interaktif OpenAPI (Scalar) dan dokumentasi Simple (`/docs`) untuk endpoint kontrol antrean dan pembatalan dokumen.
+
+### Changed
+
+- Mengganti garis animasi horizontal (*progress track*) pada kartu dokumen yang sedang diproses dengan animasi *spinning loader* mikro di dalam badge status "Memproses" agar tampilan kartu lebih bersih dan lega.
+
+### Fixed
+
+- Memperbaiki aturan CSS specificity pada atribut `[hidden]` sehingga banner antrean tidak lagi muncul saat status antrean aktif/berjalan.
+- Memperbaiki masalah *stacking context* pada menu aksi dokumen dengan menaikkan `z-index` kartu yang aktif (`.is-action-open` / `:has(.job-action-menu[open])`) agar panel dropdown tidak tertutup atau muncul di belakang kartu dokumen lain di dalam grid.
+
 ## [1.6.0] - 2026-08-15
 
 ### Added

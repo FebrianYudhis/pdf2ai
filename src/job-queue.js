@@ -60,11 +60,23 @@ export class JobQueue {
     this.jobs = new Map();
     this.pending = [];
     this.processing = false;
+    this.paused = false;
+    this.activeJob = null;
     this.idleWaiters = [];
   }
 
   async init() {
     await mkdir(this.dataDirectory, { recursive: true });
+
+    try {
+      const stateContent = await readFile(this.#queueStatePath(), "utf8");
+      const state = JSON.parse(stateContent);
+      if (typeof state.paused === "boolean") {
+        this.paused = state.paused;
+      }
+    } catch {
+      // Abaikan bila file state belum ada atau corrupt
+    }
 
     const entries = await readdir(this.dataDirectory, { withFileTypes: true });
     const recovered = [];
@@ -174,6 +186,51 @@ export class JobQueue {
     return affected.length;
   }
 
+  async pause() {
+    this.paused = true;
+    await this.#persistQueueState();
+    return this.stats();
+  }
+
+  async resume() {
+    this.paused = false;
+    await this.#persistQueueState();
+    this.#schedule();
+    return this.stats();
+  }
+
+  async cancel(id) {
+    const job = this.#require(id);
+    if (job.status === "completed" || job.status === "failed") {
+      throw new JobError(
+        409,
+        `Job dengan status '${job.status}' tidak dapat dibatalkan.`,
+      );
+    }
+
+    if (job.status === "queued") {
+      this.pending = this.pending.filter((pendingId) => pendingId !== id);
+      job.status = "failed";
+      job.completedAt = new Date().toISOString();
+      job.error = "Dibatalkan oleh pengguna.";
+      await this.#persist(job);
+      return publicJob(job);
+    }
+
+    if (job.status === "processing") {
+      if (this.activeJob && this.activeJob.id === id) {
+        this.activeJob.cancelled = true;
+      }
+      job.status = "failed";
+      job.completedAt = new Date().toISOString();
+      job.error = "Dibatalkan oleh pengguna.";
+      await this.#persist(job);
+      return publicJob(job);
+    }
+
+    return publicJob(job);
+  }
+
   stats() {
     const counts = {
       queued: 0,
@@ -188,7 +245,10 @@ export class JobQueue {
       }
     }
 
-    return counts;
+    return {
+      ...counts,
+      paused: this.paused,
+    };
   }
 
   async markdown(id) {
@@ -222,7 +282,7 @@ export class JobQueue {
   }
 
   async waitForIdle() {
-    if (!this.processing && this.pending.length === 0) {
+    if (!this.processing && (this.paused || this.pending.length === 0)) {
       return;
     }
     await new Promise((resolvePromise) => {
@@ -249,6 +309,22 @@ export class JobQueue {
     return directory;
   }
 
+  #queueStatePath() {
+    return join(this.dataDirectory, ".queue-state.json");
+  }
+
+  async #persistQueueState() {
+    const target = this.#queueStatePath();
+    const temporary = `${target}.${randomUUID()}.tmp`;
+    await writeFile(
+      temporary,
+      `${JSON.stringify({ paused: this.paused }, null, 2)}\n`,
+      "utf8",
+    );
+    await rm(target, { force: true });
+    await rename(temporary, target);
+  }
+
   #metadataPath(id) {
     return join(this.#jobDirectory(id), "metadata.json");
   }
@@ -266,7 +342,7 @@ export class JobQueue {
   }
 
   #schedule() {
-    if (this.processing || this.pending.length === 0) {
+    if (this.paused || this.processing || this.pending.length === 0) {
       return;
     }
 
@@ -278,19 +354,24 @@ export class JobQueue {
   }
 
   async #drain() {
-    if (this.processing) {
+    if (this.processing || this.paused) {
       return;
     }
     this.processing = true;
 
     try {
       while (this.pending.length > 0) {
+        if (this.paused) {
+          break;
+        }
+
         const id = this.pending.shift();
         const job = this.jobs.get(id);
         if (!job || job.status !== "queued") {
           continue;
         }
 
+        this.activeJob = { id, cancelled: false };
         job.status = "processing";
         job.startedAt = new Date().toISOString();
         job.completedAt = null;
@@ -302,29 +383,45 @@ export class JobQueue {
             join(this.#jobDirectory(id), "input.pdf"),
             this.config,
           );
-          await writeFile(this.#resultPath(id), markdown, "utf8");
-          job.status = "completed";
-          job.completedAt = new Date().toISOString();
-          await this.#persist(job);
+
+          if (this.activeJob?.cancelled) {
+            job.status = "failed";
+            job.completedAt = new Date().toISOString();
+            job.error = "Dibatalkan oleh pengguna.";
+            await this.#persist(job);
+          } else {
+            await writeFile(this.#resultPath(id), markdown, "utf8");
+            job.status = "completed";
+            job.completedAt = new Date().toISOString();
+            await this.#persist(job);
+          }
         } catch (error) {
-          job.status = "failed";
-          job.completedAt = new Date().toISOString();
-          job.error = error?.message || "Ekstraksi PDF gagal.";
-          await this.#persist(job);
-          this.logger.error?.(
-            { err: error, jobId: id },
-            "Ekstraksi PDF gagal",
-          );
+          if (this.activeJob?.cancelled) {
+            job.status = "failed";
+            job.completedAt = new Date().toISOString();
+            job.error = "Dibatalkan oleh pengguna.";
+            await this.#persist(job);
+          } else {
+            job.status = "failed";
+            job.completedAt = new Date().toISOString();
+            job.error = error?.message || "Ekstraksi PDF gagal.";
+            await this.#persist(job);
+            this.logger.error?.(
+              { err: error, jobId: id },
+              "Ekstraksi PDF gagal",
+            );
+          }
+        } finally {
+          this.activeJob = null;
         }
       }
     } finally {
       this.processing = false;
       const waiters = this.idleWaiters.splice(0);
       waiters.forEach((resolvePromise) => resolvePromise());
-      if (this.pending.length > 0) {
+      if (!this.paused && this.pending.length > 0) {
         this.#schedule();
       }
     }
   }
-
 }

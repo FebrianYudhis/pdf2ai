@@ -401,6 +401,11 @@ test("dashboard, sub-navbar docs, Scalar API reference, dan health tersedia", as
   assert.match(page.body, /aria-controls="topbar-actions"/);
   assert.match(page.body, /id="ask-ai-dialog"/);
   assert.match(page.body, /id="job-list" role="list"/);
+  assert.match(page.body, /id="pagination-nav"/);
+  assert.match(page.body, /id="pagination-prev"/);
+  assert.match(page.body, /id="pagination-next"/);
+  assert.match(page.body, /id="queue-toggle-button"/);
+  assert.match(page.body, /id="queue-paused-banner"/);
   assert.match(page.body, /id="upload-size-limit"/);
   assert.doesNotMatch(page.body, /maksimum 25 MB per file/);
   assert.equal(docs.statusCode, 200);
@@ -409,6 +414,10 @@ test("dashboard, sub-navbar docs, Scalar API reference, dan health tersedia", as
   assert.match(docs.body, /<ul>/);
   assert.match(docs.body, /href="\/docs" aria-current="page"/);
   assert.match(docs.body, /href="\/docs\/scalar"/);
+  assert.match(docs.body, /href="#queue-control"/);
+  assert.match(docs.body, /href="#cancel-job"/);
+  assert.match(docs.body, /\/v1\/queue\/pause/);
+  assert.match(docs.body, /\/v1\/jobs\/:id\/cancel/);
   assert.equal(docsSlash.statusCode, 200);
   assert.equal(scalarDocs.statusCode, 200);
   assert.match(scalarDocs.body, /href="\/docs\/scalar" aria-current="page"/);
@@ -424,6 +433,9 @@ test("dashboard, sub-navbar docs, Scalar API reference, dan health tersedia", as
   assert.ok(specification.paths["/v1/jobs"]?.post);
   assert.ok(specification.paths["/v1/folders/{id}"]?.get);
   assert.ok(specification.paths["/v1/jobs/{jobId}/ai/{aiId}"]?.get);
+  assert.ok(specification.paths["/v1/queue/pause"]?.post);
+  assert.ok(specification.paths["/v1/queue/resume"]?.post);
+  assert.ok(specification.paths["/v1/jobs/{id}/cancel"]?.post);
   assert.equal(specification.paths["/login"], undefined);
   assert.deepEqual(specification.paths["/v1/health"].get.security, []);
   assert.equal(
@@ -441,12 +453,24 @@ test("dashboard, sub-navbar docs, Scalar API reference, dan health tersedia", as
   assert.equal(appScript.statusCode, 200);
   assert.match(appScript.body, /confirmDeletion/);
   assert.match(appScript.body, /Swal\.fire/);
+  assert.match(appScript.body, /toggleQueue/);
+  assert.match(appScript.body, /cancelJob/);
+  assert.match(appScript.body, /updateQueueState/);
+  assert.match(appScript.body, /renderPagination/);
+  assert.match(appScript.body, /ITEMS_PER_PAGE\s*=\s*6/);
+  assert.match(appScript.body, /is-action-open/);
+  assert.doesNotMatch(appScript.body, /progress-track/);
   assert.match(appScript.body, /pendingAiRequests/);
   assert.match(appScript.body, /AI gagal menjawab/);
   assert.match(appScript.body, /formatLastUpdated/);
   assert.match(appScript.body, /getActiveAlertTarget/);
   assert.match(appScript.body, /modal-toast-region/);
   assert.match(mainStyles.body, /\.modal-toast-region/);
+  assert.match(mainStyles.body, /\.queue-paused-banner\[hidden\]/);
+  assert.match(mainStyles.body, /\.job-card\.is-action-open/);
+  assert.match(mainStyles.body, /\.status-badge\.processing::before/);
+  assert.match(mainStyles.body, /\.pagination-nav/);
+  assert.match(mainStyles.body, /\.pagination-page-button/);
   assert.match(appScript.body, /jobActionMenu/);
   assert.match(appScript.body, /job-action-trigger/);
   assert.match(appScript.body, /actionIconPaths/);
@@ -477,7 +501,7 @@ test("dashboard, sub-navbar docs, Scalar API reference, dan health tersedia", as
     status: "ok",
     mode: "local",
     hybridReady: true,
-    queue: { queued: 0, processing: 0, completed: 0, failed: 0 },
+    queue: { queued: 0, processing: 0, completed: 0, failed: 0, paused: false },
   });
   assert.equal(oldHealth.statusCode, 404);
   assert.equal(oldAi.statusCode, 404);
@@ -1226,3 +1250,64 @@ test("file tanpa signature PDF ditolak", async (t) => {
   assert.match(response.json().error, /bukan PDF/);
   assert.equal(app.jobs.list().length, 0);
 });
+
+test("endpoint /v1/queue/pause, /v1/queue/resume, dan /v1/jobs/:id/cancel bekerja dengan baik", async (t) => {
+  const app = await buildServer({
+    config: testConfig(),
+    extractor: async () => {
+      await new Promise((r) => setTimeout(r, 20));
+      return "# Konten";
+    },
+  });
+  t.after(() => app.close());
+
+  // Pause queue via API
+  const pauseRes = await app.inject({
+    method: "POST",
+    url: "/v1/queue/pause",
+  });
+  assert.equal(pauseRes.statusCode, 200);
+  assert.equal(pauseRes.json().paused, true);
+
+  // Upload job 1 & job 2
+  const upload1 = await app.inject({
+    method: "POST",
+    url: "/v1/jobs",
+    ...multipartPdf("file", "%PDF-1.7\none", "one.pdf"),
+  });
+  const upload2 = await app.inject({
+    method: "POST",
+    url: "/v1/jobs",
+    ...multipartPdf("file", "%PDF-1.7\ntwo", "two.pdf"),
+  });
+
+  const job1Id = upload1.json().job.id;
+  const job2Id = upload2.json().job.id;
+
+  // Cancel job2 saat masih di antrean
+  const cancelRes = await app.inject({
+    method: "POST",
+    url: `/v1/jobs/${job2Id}/cancel`,
+  });
+  assert.equal(cancelRes.statusCode, 200);
+  assert.equal(cancelRes.json().job.status, "failed");
+  assert.equal(cancelRes.json().job.error, "Dibatalkan oleh pengguna.");
+
+  // Resume queue via API
+  const resumeRes = await app.inject({
+    method: "POST",
+    url: "/v1/queue/resume",
+  });
+  assert.equal(resumeRes.statusCode, 200);
+  assert.equal(resumeRes.json().paused, false);
+
+  await app.jobs.waitForIdle();
+
+  const check1 = await app.inject({ method: "GET", url: `/v1/jobs/${job1Id}` });
+  assert.equal(check1.json().job.status, "completed");
+
+  const check2 = await app.inject({ method: "GET", url: `/v1/jobs/${job2Id}` });
+  assert.equal(check2.json().job.status, "failed");
+  assert.equal(check2.json().job.error, "Dibatalkan oleh pengguna.");
+});
+

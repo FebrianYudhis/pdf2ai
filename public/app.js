@@ -26,6 +26,8 @@ const actionIconPaths = {
   api: "m8 8-4 4 4 4m8-8 4 4-4 4m-3-10-2 12",
   folder:
     "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Zm6 6h6m-3-3 3 3-3 3",
+  cancel:
+    "M18.3 5.71a1 1 0 0 0-1.42 0L12 10.59 7.12 5.71a1 1 0 0 0-1.42 1.42L10.59 12l-4.89 4.88a1 1 0 0 0 1.42 1.42L12 13.41l4.88 4.89a1 1 0 0 0 1.42-1.42L13.41 12l4.89-4.88a1 1 0 0 0 0-1.41Z",
   danger: "M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13m-8 4v5m4-5v5",
 };
 
@@ -184,6 +186,7 @@ function closeJobActionMenus(except = null) {
   for (const menu of document.querySelectorAll(".job-action-menu[open]")) {
     if (menu !== except) {
       menu.removeAttribute("open");
+      menu.closest(".job-card")?.classList.remove("is-action-open");
     }
   }
 }
@@ -211,11 +214,15 @@ function jobActionMenu(job, buttons) {
 
   menu.addEventListener("toggle", () => {
     trigger.setAttribute("aria-expanded", String(menu.open));
+    menu.closest(".job-card")?.classList.toggle("is-action-open", menu.open);
     if (menu.open) {
       closeJobActionMenus(menu);
     }
   });
-  panel.addEventListener("click", () => menu.removeAttribute("open"));
+  panel.addEventListener("click", () => {
+    menu.removeAttribute("open");
+    menu.closest(".job-card")?.classList.remove("is-action-open");
+  });
   menu.append(trigger, panel);
   return menu;
 }
@@ -245,6 +252,7 @@ function updateFolderFilterState() {
 
 function setFolderFilter(filter, { syncUploadFolder = true } = {}) {
   activeFolderFilter = filter;
+  currentJobsPage = 1;
   updateFolderFilterState();
   if (syncUploadFolder) {
     if (filter === "unfiled") {
@@ -481,10 +489,66 @@ async function moveJobToFolder(job) {
   }
 }
 
+const ITEMS_PER_PAGE = 6;
+let currentJobsPage = 1;
+
+function renderPagination(totalItems) {
+  if (!elements.paginationNav) return;
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+
+  if (totalPages <= 1) {
+    elements.paginationNav.hidden = true;
+    return;
+  }
+
+  elements.paginationNav.hidden = false;
+  currentJobsPage = Math.min(Math.max(1, currentJobsPage), totalPages);
+
+  const startItem = (currentJobsPage - 1) * ITEMS_PER_PAGE + 1;
+  const endItem = Math.min(currentJobsPage * ITEMS_PER_PAGE, totalItems);
+
+  if (elements.paginationInfo) {
+    elements.paginationInfo.textContent = `Menampilkan ${startItem}–${endItem} dari ${totalItems} dokumen`;
+  }
+  if (elements.paginationPrev) {
+    elements.paginationPrev.disabled = currentJobsPage <= 1;
+  }
+  if (elements.paginationNext) {
+    elements.paginationNext.disabled = currentJobsPage >= totalPages;
+  }
+
+  if (elements.paginationPages) {
+    elements.paginationPages.replaceChildren(
+      ...Array.from({ length: totalPages }, (_, index) => {
+        const pageNumber = index + 1;
+        const pageBtn = document.createElement("button");
+        pageBtn.type = "button";
+        pageBtn.className = `pagination-page-button${pageNumber === currentJobsPage ? " active" : ""}`;
+        pageBtn.textContent = String(pageNumber);
+        pageBtn.setAttribute("aria-label", `Halaman ${pageNumber}`);
+        if (pageNumber === currentJobsPage) {
+          pageBtn.setAttribute("aria-current", "page");
+        }
+        pageBtn.addEventListener("click", () => {
+          if (currentJobsPage !== pageNumber) {
+            currentJobsPage = pageNumber;
+            renderJobs(latestJobs);
+          }
+        });
+        return pageBtn;
+      }),
+    );
+  }
+}
+
 function renderJobs(jobs) {
   latestJobs = jobs;
   const filteredJobs = visibleJobs(jobs);
   if (filteredJobs.length === 0) {
+    currentJobsPage = 1;
+    if (elements.paginationNav) {
+      elements.paginationNav.hidden = true;
+    }
     const folder = currentFolder();
     elements.emptyStateTitle.textContent =
       activeFolderFilter === "all" ? "Belum ada dokumen" : "Folder masih kosong";
@@ -497,7 +561,15 @@ function renderJobs(jobs) {
     return;
   }
 
-  const cards = filteredJobs.map((job) => {
+  const totalPages = Math.ceil(filteredJobs.length / ITEMS_PER_PAGE);
+  if (currentJobsPage > totalPages) {
+    currentJobsPage = Math.max(1, totalPages);
+  }
+
+  const startIndex = (currentJobsPage - 1) * ITEMS_PER_PAGE;
+  const pageJobs = filteredJobs.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  const cards = pageJobs.map((job) => {
     const card = document.createElement("article");
     card.className = `job-card ${job.status}`;
     card.setAttribute("role", "listitem");
@@ -529,12 +601,6 @@ function renderJobs(jobs) {
       metaRow.append(folderBadge);
     }
     details.append(name, metaRow);
-    if (job.status === "processing") {
-      const progress = document.createElement("span");
-      progress.className = "progress-track";
-      progress.append(document.createElement("span"));
-      details.append(progress);
-    }
     if (job.status === "failed" && job.error) {
       const error = document.createElement("small");
       error.className = "error-copy";
@@ -602,6 +668,17 @@ function renderJobs(jobs) {
         "folder",
       ),
     );
+    if (job.status === "queued" || job.status === "processing") {
+      actionButtons.push(
+        actionButton(
+          "Batalkan",
+          "job-menu-action cancel",
+          () => cancelJob(job),
+          "Batalkan pemrosesan dokumen ini",
+          "cancel",
+        ),
+      );
+    }
     if (job.status === "completed" || job.status === "failed") {
       actionButtons.push(
         actionButton(
@@ -628,12 +705,14 @@ function renderJobs(jobs) {
   });
 
   elements.jobList.replaceChildren(...cards);
+  renderPagination(filteredJobs.length);
 }
 
 function updateStats(stats) {
   for (const [status, element] of Object.entries(elements.counts)) {
     element.textContent = stats[status] ?? 0;
   }
+  updateQueueState(stats.paused);
 }
 
 async function refreshJobs({ quiet = false } = {}) {
@@ -1123,6 +1202,84 @@ function openFetchData(job) {
   elements.fetchDialog.showModal();
 }
 
+async function cancelJob(job) {
+  const isProcessing = job.status === "processing";
+  const result = await Swal.fire({
+    target: getActiveAlertTarget(),
+    title: isProcessing ? "Batalkan pemrosesan?" : "Batalkan antrean dokumen?",
+    text: `Hentikan pemrosesan “${job.originalName}”?`,
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Ya, batalkan",
+    cancelButtonText: "Kembali",
+    confirmButtonColor: "#ef4444",
+    cancelButtonColor: "#64748b",
+    customClass: {
+      popup: "pdf2ai-swal-popup",
+      title: "pdf2ai-swal-title",
+    },
+  });
+  if (!result.isConfirmed) {
+    return;
+  }
+
+  try {
+    await api(`/v1/jobs/${encodeURIComponent(job.id)}/cancel`, {
+      method: "POST",
+    });
+    showToast(`Dokumen “${job.originalName}” berhasil dibatalkan.`);
+    await refreshJobs({ quiet: true });
+  } catch (error) {
+    showToast(error.message, "error");
+  }
+}
+
+let queuePaused = false;
+
+function updateQueueState(paused) {
+  queuePaused = Boolean(paused);
+  if (elements.queueToggleButton) {
+    elements.queueToggleButton.classList.toggle("is-paused", queuePaused);
+    elements.queueToggleLabel.textContent = queuePaused
+      ? "Lanjutkan antrean"
+      : "Jeda antrean";
+    elements.queueToggleButton.title = queuePaused
+      ? "Lanjutkan antrean dokumen"
+      : "Jeda antrean dokumen";
+    if (elements.queueIconPause && elements.queueIconResume) {
+      elements.queueIconPause.hidden = queuePaused;
+      elements.queueIconResume.hidden = !queuePaused;
+    }
+  }
+  if (elements.queuePausedBanner) {
+    elements.queuePausedBanner.hidden = !queuePaused;
+  }
+}
+
+async function toggleQueue() {
+  const nextAction = queuePaused ? "resume" : "pause";
+  if (elements.queueToggleButton) {
+    elements.queueToggleButton.disabled = true;
+  }
+  try {
+    const response = await api(`/v1/queue/${nextAction}`, { method: "POST" });
+    const data = await response.json();
+    updateQueueState(data.paused);
+    updateStats(data.stats);
+    showToast(
+      data.paused
+        ? "Antrean dokumen dijeda."
+        : "Antrean dokumen dilanjutkan.",
+    );
+  } catch (error) {
+    showToast(error.message, "error");
+  } finally {
+    if (elements.queueToggleButton) {
+      elements.queueToggleButton.disabled = false;
+    }
+  }
+}
+
 async function deleteJob(job) {
   const confirmed = await confirmDeletion({
     title: `Hapus “${job.originalName}”?`,
@@ -1295,6 +1452,24 @@ for (const button of document.querySelectorAll("[data-copy-target]")) {
     await copyText(target?.textContent ?? "", `${label} disalin.`);
   });
 }
+
+elements.queueToggleButton?.addEventListener("click", toggleQueue);
+elements.pausedResumeAction?.addEventListener("click", toggleQueue);
+
+elements.paginationPrev?.addEventListener("click", () => {
+  if (currentJobsPage > 1) {
+    currentJobsPage--;
+    renderJobs(latestJobs);
+  }
+});
+
+elements.paginationNext?.addEventListener("click", () => {
+  const totalPages = Math.ceil(visibleJobs(latestJobs).length / ITEMS_PER_PAGE);
+  if (currentJobsPage < totalPages) {
+    currentJobsPage++;
+    renderJobs(latestJobs);
+  }
+});
 
 await Promise.all([checkHealth(), refreshAiConfig(), refreshApplicationConfig()]);
 await refreshJobs();

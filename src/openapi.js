@@ -154,6 +154,45 @@ const routeDocumentation = {
       415: errorResponse,
     },
   },
+  "POST /v1/queue/pause": {
+    tags: ["Jobs"],
+    summary: "Jeda antrean dokumen",
+    description:
+      "Menjeda pemrosesan antrean. Dokumen yang sedang berjalan diselesaikan, namun dokumen di antrean tidak diproses otomatis sampai dilanjutkan.",
+    operationId: "pauseQueue",
+    security: apiSecurity,
+    response: {
+      200: {
+        type: "object",
+        required: ["ok", "paused", "stats"],
+        properties: {
+          ok: { type: "boolean" },
+          paused: { type: "boolean" },
+          stats: { $ref: "#/components/schemas/QueueStats" },
+        },
+      },
+      401: errorResponse,
+    },
+  },
+  "POST /v1/queue/resume": {
+    tags: ["Jobs"],
+    summary: "Lanjutkan antrean dokumen",
+    description: "Melanjutkan kembali pemrosesan antrean yang dijeda.",
+    operationId: "resumeQueue",
+    security: apiSecurity,
+    response: {
+      200: {
+        type: "object",
+        required: ["ok", "paused", "stats"],
+        properties: {
+          ok: { type: "boolean" },
+          paused: { type: "boolean" },
+          stats: { $ref: "#/components/schemas/QueueStats" },
+        },
+      },
+      401: errorResponse,
+    },
+  },
   "GET /v1/jobs": {
     tags: ["Jobs"],
     summary: "Daftar semua job",
@@ -185,6 +224,23 @@ const routeDocumentation = {
       },
       401: errorResponse,
       404: errorResponse,
+    },
+  },
+  "POST /v1/jobs/:id/cancel": {
+    tags: ["Jobs"],
+    summary: "Batalkan dokumen di antrean atau yang sedang diproses",
+    operationId: "cancelJob",
+    security: apiSecurity,
+    params: uuidParams(),
+    response: {
+      200: {
+        type: "object",
+        required: ["job"],
+        properties: { job: { $ref: "#/components/schemas/Job" } },
+      },
+      401: errorResponse,
+      404: errorResponse,
+      409: errorResponse,
     },
   },
   "PATCH /v1/jobs/:id": {
@@ -389,12 +445,13 @@ export function openApiOptions() {
           },
           QueueStats: {
             type: "object",
-            required: ["queued", "processing", "completed", "failed"],
+            required: ["queued", "processing", "completed", "failed", "paused"],
             properties: {
               queued: { type: "integer", minimum: 0 },
               processing: { type: "integer", minimum: 0 },
               completed: { type: "integer", minimum: 0 },
               failed: { type: "integer", minimum: 0 },
+              paused: { type: "boolean" },
             },
           },
           Health: {
