@@ -174,12 +174,22 @@ export function createConfigurationController({
   
   function renderApiKeyStatus(status) {
     apiKeyConfigured = status.configured;
+    if (elements.apiKeyBadge) {
+      elements.apiKeyBadge.textContent = status.configured ? "Aktif" : "Nonaktif";
+      elements.apiKeyBadge.className = `api-key-badge ${status.configured ? "is-active" : "is-inactive"}`;
+    }
     elements.apiKeyStatus.textContent = status.configured
-      ? "API key aktif"
+      ? "API key aktif dan siap digunakan"
       : "Belum ada API key";
     elements.apiKeyMetadata.textContent = status.configured
-      ? `${status.prefix}… · dibuat ${formatTime(status.createdAt)}`
-      : "Buat key untuk mengaktifkan akses API eksternal.";
+      ? `Dibuat pada ${formatTime(status.createdAt)}.`
+      : "Buat key untuk mengaktifkan akses API eksternal bagi client atau automation.";
+    if (elements.apiKeySpecs) {
+      elements.apiKeySpecs.hidden = !status.configured;
+    }
+    if (elements.apiKeyPrefixVal) {
+      elements.apiKeyPrefixVal.textContent = status.prefix ? `${status.prefix}…` : "-";
+    }
     elements.generateApiKey.textContent = status.configured
       ? "Rotasi API key"
       : "Buat API key";
@@ -227,13 +237,15 @@ export function createConfigurationController({
   }
   
   async function generateApiKey() {
-    if (
-      apiKeyConfigured &&
-      !window.confirm(
-        "Rotasi API key? Key lama akan langsung berhenti berfungsi.",
-      )
-    ) {
-      return;
+    if (apiKeyConfigured) {
+      const confirmed = await confirmDeletion({
+        title: "Rotasi API key?",
+        text: "API key lama akan langsung berhenti berfungsi dan tidak dapat digunakan kembali.",
+        confirmButtonText: "Ya, rotasi key",
+      });
+      if (!confirmed) {
+        return;
+      }
     }
   
     elements.generateApiKey.disabled = true;

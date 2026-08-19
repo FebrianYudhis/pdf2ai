@@ -4,7 +4,15 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) dan versi mengikuti
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.7.1] - 2026-08-19
+
+### Changed
+
+- Memperbarui tampilan tab **Konfigurasi API Key** dengan desain yang lebih modern dan informatif:
+  - Indikator status key berbentuk badge (Aktif / Nonaktif) beserta ringkasan spesifikasi header (`X-API-Key`), prefix key, dan cakupan scope akses (`/v1/*`).
+  - Tautan langsung (_pills_) ke dokumentasi Simple Guide dan Scalar OpenAPI.
+  - Kartu contoh integrasi cURL interaktif lengkap dengan tombol salin cepat.
+  - Peningkatan dialog konfirmasi rotasi API key menggunakan SweetAlert terintegrasi menggantikan `window.confirm` bawaan browser.
 
 ## [1.7.0] - 2026-08-19
 
@@ -24,12 +32,12 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 
 ### Changed
 
-- Mengganti garis animasi horizontal (*progress track*) pada kartu dokumen yang sedang diproses dengan animasi *spinning loader* mikro di dalam badge status "Memproses" agar tampilan kartu lebih bersih dan lega.
+- Mengganti garis animasi horizontal (_progress track_) pada kartu dokumen yang sedang diproses dengan animasi _spinning loader_ mikro di dalam badge status "Memproses" agar tampilan kartu lebih bersih dan lega.
 
 ### Fixed
 
 - Memperbaiki aturan CSS specificity pada atribut `[hidden]` sehingga banner antrean tidak lagi muncul saat status antrean aktif/berjalan.
-- Memperbaiki masalah *stacking context* pada menu aksi dokumen dengan menaikkan `z-index` kartu yang aktif (`.is-action-open` / `:has(.job-action-menu[open])`) agar panel dropdown tidak tertutup atau muncul di belakang kartu dokumen lain di dalam grid.
+- Memperbaiki masalah _stacking context_ pada menu aksi dokumen dengan menaikkan `z-index` kartu yang aktif (`.is-action-open` / `:has(.job-action-menu[open])`) agar panel dropdown tidak tertutup atau muncul di belakang kartu dokumen lain di dalam grid.
 
 ## [1.6.0] - 2026-08-15
 

@@ -471,6 +471,11 @@ test("dashboard, sub-navbar docs, Scalar API reference, dan health tersedia", as
   assert.match(mainStyles.body, /\.status-badge\.processing::before/);
   assert.match(mainStyles.body, /\.pagination-nav/);
   assert.match(mainStyles.body, /\.pagination-page-button/);
+  assert.match(mainStyles.body, /\.api-key-badge\.is-active/);
+  assert.match(mainStyles.body, /\.api-key-specs-grid/);
+  assert.match(mainStyles.body, /\.api-key-example-card/);
+  assert.match(page.body, /id="api-key-badge"/);
+  assert.match(page.body, /id="api-key-specs"/);
   assert.match(appScript.body, /jobActionMenu/);
   assert.match(appScript.body, /job-action-trigger/);
   assert.match(appScript.body, /actionIconPaths/);
@@ -481,6 +486,7 @@ test("dashboard, sub-navbar docs, Scalar API reference, dan health tersedia", as
   assert.match(appScript.body, /syncUploadFolder/);
   assert.match(configurationController.body, /syncUploadSizeInformation/);
   assert.match(configurationController.body, /MB setelah restart/);
+  assert.match(configurationController.body, /Rotasi API key\?/);
   for (const moduleAsset of [
     appElements,
     appUtils,

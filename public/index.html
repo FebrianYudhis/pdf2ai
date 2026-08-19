@@ -571,12 +571,64 @@
 
           <section class="config-panel" id="config-panel-api" role="tabpanel" aria-labelledby="config-tab-api" data-config-panel="api" hidden>
             <div class="api-key-dialog-body">
-              <p>Gunakan API key untuk mengakses endpoint <code>/v1/*</code> dari aplikasi eksternal melalui header <code>X-API-Key</code>.</p>
-              <section class="api-key-status-card"><span class="api-field-label">STATUS</span><strong id="api-key-status">Memeriksa…</strong><small id="api-key-metadata"></small></section>
-              <section class="api-key-reveal" id="api-key-reveal" hidden><span class="api-field-label">API KEY BARU — TAMPIL SEKALI</span><code id="api-key-value"></code><p>Salin dan simpan sekarang. Setelah dialog ditutup, key lengkap tidak dapat dilihat kembali.</p><button class="secondary-button" id="copy-api-key" type="button">Salin API key</button></section>
+              <div class="api-key-intro">
+                <p>Gunakan API key untuk mengakses seluruh endpoint <code>/v1/*</code> dari aplikasi eksternal atau skrip otomatisasi melalui header <code>X-API-Key</code>.</p>
+                <div class="api-key-doc-links">
+                  <a href="/docs" target="_blank" class="api-doc-pill"><span>Simple Guide</span> ↗</a>
+                  <a href="/docs/scalar" target="_blank" class="api-doc-pill"><span>Scalar OpenAPI</span> ↗</a>
+                </div>
+              </div>
+
+              <section class="api-key-status-card" id="api-key-status-container">
+                <div class="api-key-status-header">
+                  <span class="api-field-label">STATUS KEY</span>
+                  <span class="api-key-badge is-inactive" id="api-key-badge">Memeriksa…</span>
+                </div>
+                <strong id="api-key-status">Memeriksa…</strong>
+                <p class="api-key-meta-desc" id="api-key-metadata"></p>
+                <div class="api-key-specs-grid" id="api-key-specs" hidden>
+                  <div class="api-spec-item">
+                    <span>HEADER</span>
+                    <code>X-API-Key</code>
+                  </div>
+                  <div class="api-spec-item">
+                    <span>PREFIX</span>
+                    <code id="api-key-prefix-val">-</code>
+                  </div>
+                  <div class="api-spec-item">
+                    <span>SCOPE</span>
+                    <span>Endpoint <code>/v1/*</code></span>
+                  </div>
+                </div>
+              </section>
+
+              <section class="api-key-reveal" id="api-key-reveal" hidden>
+                <div class="api-key-reveal-header">
+                  <span class="api-field-label">API KEY BARU — HANYA TAMPIL SEKALI</span>
+                  <span class="api-reveal-badge">Secret</span>
+                </div>
+                <div class="api-key-value-box">
+                  <code id="api-key-value"></code>
+                  <button class="secondary-button" id="copy-api-key" type="button" aria-label="Salin API Key">Salin key</button>
+                </div>
+                <p class="api-reveal-note">⚠️ Salin dan simpan sekarang di tempat aman. Setelah dialog ditutup, key lengkap tidak akan pernah ditampilkan kembali.</p>
+              </section>
+
+              <section class="api-key-example-card">
+                <div class="api-key-example-header">
+                  <span>CONTOH INTEGRASI cURL</span>
+                  <button class="icon-copy-link" type="button" data-copy-target="api-curl-code" data-copy-label="Contoh cURL">Salin</button>
+                </div>
+                <pre class="api-curl-code" id="api-curl-code"><code>curl -H "X-API-Key: YOUR_API_KEY" \
+  http://127.0.0.1:3000/v1/jobs</code></pre>
+              </section>
+
               <p class="api-key-warning" id="api-key-warning" hidden></p>
             </div>
-            <div class="api-key-dialog-actions"><button class="secondary-button danger-button" id="revoke-api-key" type="button">Cabut key</button><button class="primary-button" id="generate-api-key" type="button">Buat API key</button></div>
+            <div class="api-key-dialog-actions">
+              <button class="secondary-button danger-button" id="revoke-api-key" type="button">Cabut key</button>
+              <button class="primary-button" id="generate-api-key" type="button">Buat API key</button>
+            </div>
           </section>
         </div>
       </div>
