@@ -4,6 +4,19 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) dan versi mengikuti
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.3] - 2026-08-20
+
+### Added
+
+- Fitur **Pencarian Dokumen (Search Bar)** real-time pada dashboard dengan input pencarian, ikon pencarian, tombol pembersih cepat (*clear button*), serta *empty state* khusus saat dokumen tidak ditemukan.
+- Fitur **Multi-Select Dokumen & Aksi Massal (Batch Actions)**:
+  - Checkbox interaktif pada setiap kartu dokumen beserta *highlight* visual saat dipilih (`.job-card.is-selected`).
+  - **Batch Action Bar** yang otomatis muncul saat satu atau lebih dokumen dipilih, menampilkan jumlah dokumen terpilih, kontrol *Select All* per halaman, tombol **Pindahkan Terpilih** ke folder virtual, dan tombol **Hapus Terpilih** dengan konfirmasi dialog.
+
+### Fixed
+
+- Menyamakan proporsi dan gaya tombol aksi *deny* (`.swal2-deny`, contohnya tombol "Hapus folder" pada menu kelola) dengan tombol aksi lainnya pada dialog SweetAlert.
+
 ## [1.7.2] - 2026-08-20
 
 ### Added

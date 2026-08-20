@@ -42,6 +42,8 @@ let activeFolderFilter = "all";
 let currentAiJob = null;
 const pendingAiRequests = new Map();
 let aiErrorAlertQueue = Promise.resolve();
+let searchQuery = "";
+const selectedJobIds = new Set();
 
 if (elements.toastRegion && typeof elements.toastRegion.showPopover === "function") {
   try {
@@ -334,13 +336,140 @@ function renderFolderControls(collection) {
 }
 
 function visibleJobs(jobs) {
-  if (activeFolderFilter === "all") {
-    return jobs;
-  }
+  let list = jobs;
   if (activeFolderFilter === "unfiled") {
-    return jobs.filter((job) => !job.folderId);
+    list = list.filter((job) => !job.folderId);
+  } else if (activeFolderFilter !== "all") {
+    list = list.filter((job) => job.folderId === activeFolderFilter);
   }
-  return jobs.filter((job) => job.folderId === activeFolderFilter);
+
+  const query = searchQuery.trim().toLowerCase();
+  if (query) {
+    list = list.filter((job) =>
+      job.originalName.toLowerCase().includes(query),
+    );
+  }
+
+  return list;
+}
+
+function updateBatchActionBar(pageJobs = []) {
+  if (!elements.batchActionBar) {
+    return;
+  }
+
+  const existingJobIds = new Set(latestJobs.map((j) => j.id));
+  for (const id of selectedJobIds) {
+    if (!existingJobIds.has(id)) {
+      selectedJobIds.delete(id);
+    }
+  }
+
+  const count = selectedJobIds.size;
+  if (count === 0) {
+    elements.batchActionBar.hidden = true;
+    if (elements.batchSelectAllCheckbox) {
+      elements.batchSelectAllCheckbox.checked = false;
+      elements.batchSelectAllCheckbox.indeterminate = false;
+    }
+    return;
+  }
+
+  elements.batchActionBar.hidden = false;
+  if (elements.batchSelectedCount) {
+    elements.batchSelectedCount.textContent = `${count} dokumen dipilih`;
+  }
+
+  if (elements.batchSelectAllCheckbox) {
+    const allPageSelected =
+      pageJobs.length > 0 && pageJobs.every((j) => selectedJobIds.has(j.id));
+    const somePageSelected =
+      !allPageSelected && pageJobs.some((j) => selectedJobIds.has(j.id));
+
+    elements.batchSelectAllCheckbox.checked = allPageSelected;
+    elements.batchSelectAllCheckbox.indeterminate = somePageSelected;
+  }
+}
+
+async function batchMoveSelected() {
+  const count = selectedJobIds.size;
+  if (count === 0) {
+    return;
+  }
+
+  const inputOptions = { __unfiled__: "Tanpa folder" };
+  for (const folder of virtualFolders) {
+    inputOptions[folder.id] = folder.name;
+  }
+
+  const result = await Swal.fire({
+    target: document.body,
+    topLayer: true,
+    title: "Pindahkan Dokumen Terpilih",
+    text: `Pindahkan ${count} dokumen terpilih ke folder tujuan:`,
+    input: "select",
+    inputOptions,
+    inputValue: "__unfiled__",
+    showCancelButton: true,
+    confirmButtonText: "Pindahkan Semua",
+    cancelButtonText: "Batal",
+    customClass: { popup: "pdf2ai-swal-popup", title: "pdf2ai-swal-title" },
+  });
+
+  if (!result.isConfirmed) {
+    return;
+  }
+
+  const folderId = result.value === "__unfiled__" ? null : result.value;
+  const targetIds = Array.from(selectedJobIds);
+
+  let successCount = 0;
+  await Promise.allSettled(
+    targetIds.map(async (id) => {
+      await api(`/v1/jobs/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folderId }),
+      });
+      successCount++;
+    }),
+  );
+
+  selectedJobIds.clear();
+  await refreshJobs({ quiet: true });
+  showToast(`${successCount} dokumen berhasil dipindahkan.`);
+}
+
+async function batchDeleteSelected() {
+  const count = selectedJobIds.size;
+  if (count === 0) {
+    return;
+  }
+
+  const confirmed = await confirmDeletion({
+    title: `Hapus ${count} dokumen terpilih?`,
+    text: "Dokumen yang dipilih akan dihapus dari antrean dan riwayat hasil.",
+    confirmButtonText: `Hapus (${count})`,
+  });
+
+  if (!confirmed) {
+    return;
+  }
+
+  const targetIds = Array.from(selectedJobIds);
+  let successCount = 0;
+  await Promise.allSettled(
+    targetIds.map(async (id) => {
+      await api(`/v1/jobs/${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      successCount++;
+    }),
+  );
+
+  selectedJobIds.clear();
+  await refreshJobs({ quiet: true });
+  showToast(`${successCount} dokumen berhasil dihapus.`);
 }
 
 async function createVirtualFolder() {
@@ -557,14 +686,21 @@ function renderJobs(jobs) {
     if (elements.paginationNav) {
       elements.paginationNav.hidden = true;
     }
+    updateBatchActionBar([], filteredJobs);
     const folder = currentFolder();
-    elements.emptyStateTitle.textContent =
-      activeFolderFilter === "all" ? "Belum ada dokumen" : "Folder masih kosong";
-    elements.emptyStateCopy.textContent = folder
-      ? `Pilih folder “${folder.name}” saat upload atau pindahkan dokumen ke sini.`
-      : activeFolderFilter === "unfiled"
-        ? "Semua dokumen saat ini sudah dikelompokkan ke dalam folder."
-        : "PDF yang Anda unggah akan dipantau dari halaman ini.";
+    const query = searchQuery.trim();
+    if (query) {
+      elements.emptyStateTitle.textContent = "Dokumen tidak ditemukan";
+      elements.emptyStateCopy.textContent = `Tidak ada dokumen yang cocok dengan kata kunci “${query}”.`;
+    } else {
+      elements.emptyStateTitle.textContent =
+        activeFolderFilter === "all" ? "Belum ada dokumen" : "Folder masih kosong";
+      elements.emptyStateCopy.textContent = folder
+        ? `Pilih folder “${folder.name}” saat upload atau pindahkan dokumen ke sini.`
+        : activeFolderFilter === "unfiled"
+          ? "Semua dokumen saat ini sudah dikelompokkan ke dalam folder."
+          : "PDF yang Anda unggah akan dipantau dari halaman ini.";
+    }
     elements.jobList.replaceChildren(elements.emptyState);
     return;
   }
@@ -577,9 +713,12 @@ function renderJobs(jobs) {
   const startIndex = (currentJobsPage - 1) * ITEMS_PER_PAGE;
   const pageJobs = filteredJobs.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
+  updateBatchActionBar(pageJobs, filteredJobs);
+
   const cards = pageJobs.map((job) => {
+    const isSelected = selectedJobIds.has(job.id);
     const card = document.createElement("article");
-    card.className = `job-card ${job.status}`;
+    card.className = `job-card ${job.status}${isSelected ? " is-selected" : ""}`;
     card.setAttribute("role", "listitem");
 
     const header = document.createElement("div");
@@ -587,6 +726,30 @@ function renderJobs(jobs) {
 
     const main = document.createElement("div");
     main.className = "job-main";
+
+    const selectLabel = document.createElement("label");
+    selectLabel.className = "job-card-select-label";
+    selectLabel.title = `Pilih ${job.originalName}`;
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.className = "job-card-checkbox";
+    checkbox.checked = isSelected;
+    checkbox.setAttribute("aria-label", `Pilih ${job.originalName}`);
+    checkbox.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+    checkbox.addEventListener("change", (event) => {
+      if (event.target.checked) {
+        selectedJobIds.add(job.id);
+      } else {
+        selectedJobIds.delete(job.id);
+      }
+      renderJobs(latestJobs);
+    });
+    selectLabel.append(checkbox);
+    main.append(selectLabel);
+
     const fileIndex = document.createElement("span");
     fileIndex.className = "file-index";
     fileIndex.textContent = "PDF";
@@ -1516,6 +1679,53 @@ elements.paginationNext?.addEventListener("click", () => {
     currentJobsPage++;
     renderJobs(latestJobs);
   }
+});
+
+elements.searchDocsInput?.addEventListener("input", (event) => {
+  searchQuery = event.target.value;
+  if (elements.searchClearButton) {
+    elements.searchClearButton.hidden = !searchQuery;
+  }
+  currentJobsPage = 1;
+  renderJobs(latestJobs);
+});
+
+elements.searchClearButton?.addEventListener("click", () => {
+  if (elements.searchDocsInput) {
+    elements.searchDocsInput.value = "";
+  }
+  searchQuery = "";
+  if (elements.searchClearButton) {
+    elements.searchClearButton.hidden = true;
+  }
+  currentJobsPage = 1;
+  renderJobs(latestJobs);
+});
+
+elements.batchSelectAllCheckbox?.addEventListener("change", (event) => {
+  const filteredJobs = visibleJobs(latestJobs);
+  const totalPages = Math.ceil(filteredJobs.length / ITEMS_PER_PAGE);
+  const currentPage = Math.min(currentJobsPage, Math.max(1, totalPages));
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const pageJobs = filteredJobs.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  if (event.target.checked) {
+    for (const job of pageJobs) {
+      selectedJobIds.add(job.id);
+    }
+  } else {
+    for (const job of pageJobs) {
+      selectedJobIds.delete(job.id);
+    }
+  }
+  renderJobs(latestJobs);
+});
+
+elements.batchMoveButton?.addEventListener("click", batchMoveSelected);
+elements.batchDeleteButton?.addEventListener("click", batchDeleteSelected);
+elements.batchClearButton?.addEventListener("click", () => {
+  selectedJobIds.clear();
+  renderJobs(latestJobs);
 });
 
 await Promise.all([checkHealth(), refreshAiConfig(), refreshApplicationConfig()]);

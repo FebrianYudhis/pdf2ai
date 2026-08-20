@@ -194,6 +194,32 @@
             <button class="paused-resume-button" id="paused-resume-action" type="button">Lanjutkan</button>
           </div>
 
+          <div class="jobs-search-bar" role="search">
+            <div class="search-input-wrapper">
+              <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M10 4a6 6 0 1 0 0 12 6 6 0 0 0 0-12Zm-8 6a8 8 0 1 1 14.32 4.906l4.387 4.387a1 1 0 0 1-1.414 1.414l-4.387-4.387A8 8 0 0 1 2 10Z" />
+              </svg>
+              <input
+                type="search"
+                id="search-docs-input"
+                class="search-docs-input"
+                placeholder="Cari nama dokumen..."
+                aria-label="Cari dokumen"
+                autocomplete="off"
+              />
+              <button
+                type="button"
+                id="search-clear-button"
+                class="search-clear-button"
+                title="Bersihkan pencarian"
+                aria-label="Bersihkan pencarian"
+                hidden
+              >
+                <span aria-hidden="true">×</span>
+              </button>
+            </div>
+          </div>
+
           <div class="folder-toolbar">
             <div class="folder-filter-list" id="folder-filter-list" role="group" aria-label="Filter folder">
               <button class="folder-filter active" type="button" data-folder-filter="all">
@@ -203,6 +229,28 @@
             <div class="folder-toolbar-actions">
               <button class="folder-manage-button" id="manage-folder-button" type="button" hidden>Kelola</button>
               <button class="folder-create-button" id="create-folder-button" type="button"><span aria-hidden="true">＋</span> Folder baru</button>
+            </div>
+          </div>
+
+          <div class="batch-action-bar" id="batch-action-bar" hidden role="region" aria-label="Aksi massal dokumen">
+            <div class="batch-action-summary">
+              <label class="batch-select-all-label">
+                <input type="checkbox" id="batch-select-all-checkbox" aria-label="Pilih semua dokumen di halaman ini" />
+                <span id="batch-selected-count">0 dokumen dipilih</span>
+              </label>
+            </div>
+            <div class="batch-action-buttons">
+              <button class="batch-action-button move" id="batch-move-button" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Zm6 6h6m-3-3 3 3-3 3" /></svg>
+                <span>Pindahkan</span>
+              </button>
+              <button class="batch-action-button danger" id="batch-delete-button" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13m-8 4v5m4-5v5" /></svg>
+                <span>Hapus</span>
+              </button>
+              <button class="batch-action-button cancel" id="batch-clear-button" type="button" title="Batalkan seleksi" aria-label="Batalkan seleksi">
+                <span aria-hidden="true">✕</span>
+              </button>
             </div>
           </div>
 
