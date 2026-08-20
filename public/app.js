@@ -87,14 +87,17 @@ async function copyText(value, successMessage) {
   }
 }
 
+function getSwalTarget() {
+  return document.querySelector("dialog[open]") || document.body;
+}
+
 function showAiRequestError(job, error) {
   const message = error instanceof Error ? error.message : String(error);
   aiErrorAlertQueue = aiErrorAlertQueue
     .catch(() => undefined)
     .then(() =>
       Swal.fire({
-        target: document.body,
-        topLayer: true,
+        target: getSwalTarget(),
         icon: "error",
         title: "AI gagal menjawab",
         text: `${job.originalName}: ${message}`,
@@ -403,8 +406,7 @@ async function batchMoveSelected() {
   }
 
   const result = await Swal.fire({
-    target: document.body,
-    topLayer: true,
+    target: getSwalTarget(),
     title: "Pindahkan Dokumen Terpilih",
     text: `Pindahkan ${count} dokumen terpilih ke folder tujuan:`,
     input: "select",
@@ -474,8 +476,7 @@ async function batchDeleteSelected() {
 
 async function createVirtualFolder() {
   const result = await Swal.fire({
-    target: document.body,
-    topLayer: true,
+    target: getSwalTarget(),
     title: "Buat folder baru",
     text: "Folder hanya mengelompokkan dokumen secara virtual.",
     input: "text",
@@ -518,8 +519,7 @@ async function manageCurrentFolder() {
     return;
   }
   const choice = await Swal.fire({
-    target: document.body,
-    topLayer: true,
+    target: getSwalTarget(),
     title: folder.name,
     text: `${folder.jobCount} dokumen berada di folder ini.`,
     icon: "info",
@@ -536,8 +536,7 @@ async function manageCurrentFolder() {
 
   if (choice.isConfirmed) {
     const renamed = await Swal.fire({
-      target: document.body,
-      topLayer: true,
+      target: getSwalTarget(),
       title: "Ubah nama folder",
       input: "text",
       inputValue: folder.name,
@@ -594,8 +593,7 @@ async function moveJobToFolder(job) {
     inputOptions[folder.id] = folder.name;
   }
   const result = await Swal.fire({
-    target: document.body,
-    topLayer: true,
+    target: getSwalTarget(),
     title: "Pindahkan dokumen",
     text: job.originalName,
     input: "select",
@@ -960,8 +958,7 @@ async function checkHealth() {
 
 async function confirmDeletion({ title, text, confirmButtonText = "Hapus" }) {
   const result = await Swal.fire({
-    target: document.body,
-    topLayer: true,
+    target: getSwalTarget(),
     title,
     text,
     icon: "warning",
@@ -999,6 +996,7 @@ const configuration = createConfigurationController({
   showToast,
   refreshJobs,
   applicationFieldLabels,
+  confirmDeletion,
 });
 
 const {
@@ -1414,8 +1412,7 @@ function openFetchData(job) {
 async function cancelJob(job) {
   const isProcessing = job.status === "processing";
   const result = await Swal.fire({
-    target: document.body,
-    topLayer: true,
+    target: getSwalTarget(),
     title: isProcessing ? "Batalkan pemrosesan?" : "Batalkan antrean dokumen?",
     text: `Hentikan pemrosesan “${job.originalName}”?`,
     icon: "warning",

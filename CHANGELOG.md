@@ -4,6 +4,15 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) dan versi mengikuti
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.4] - 2026-08-20
+
+### Fixed
+
+- Memperbaiki fungsi **Rotasi API key**, **Cabut key**, dan **Hapus konfigurasi AI** yang tidak merespons akibat `ReferenceError: confirmDeletion is not defined` pada `public/configuration-controller.js` dengan mengoper fungsi `confirmDeletion` dari `public/app.js`.
+- Memperbaiki posisi penumpukan dialog konfirmasi SweetAlert (`Swal.fire`) agar selalu tampil di lapisan terdepan (*top layer*) di atas modal aktif:
+  - Menggantikan target statis `document.body` dengan penargetan dinamis `getSwalTarget()` (`document.querySelector("dialog[open]") || document.body`).
+  - Menghindari bug layer pada modal browser native (`<dialog>.showModal()`), sehingga dialog konfirmasi pada menu konfigurasi API key, Tanya AI, dan manajemen dokumen tidak lagi terhalang di belakang backdrop modal.
+
 ## [1.7.3] - 2026-08-20
 
 ### Added

@@ -6,6 +6,7 @@ export function createConfigurationController({
   showToast,
   refreshJobs,
   applicationFieldLabels,
+  confirmDeletion,
 }) {
   let apiKeyConfigured = false;
   let importedAiModels = [];

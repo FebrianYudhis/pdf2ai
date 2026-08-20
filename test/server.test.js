@@ -462,7 +462,7 @@ test("dashboard, sub-navbar docs, Scalar API reference, dan health tersedia", as
   assert.doesNotMatch(appScript.body, /progress-track/);
   assert.match(appScript.body, /pendingAiRequests/);
   assert.match(appScript.body, /AI gagal menjawab/);
-  assert.match(appScript.body, /topLayer/);
+  assert.match(appScript.body, /getSwalTarget/);
   assert.match(appScript.body, /toastRegion/);
   assert.match(mainStyles.body, /\.toast-region/);
   assert.match(mainStyles.body, /\.queue-paused-banner\[hidden\]/);
@@ -502,6 +502,8 @@ test("dashboard, sub-navbar docs, Scalar API reference, dan health tersedia", as
   assert.match(configurationController.body, /syncUploadSizeInformation/);
   assert.match(configurationController.body, /MB setelah restart/);
   assert.match(configurationController.body, /Rotasi API key\?/);
+  assert.match(configurationController.body, /confirmDeletion/);
+  assert.match(appScript.body, /createConfigurationController\(\{[\s\S]*confirmDeletion/);
   for (const moduleAsset of [
     appElements,
     appUtils,
