@@ -478,7 +478,7 @@ export function createConfigurationController({
       importedAiModels = [...aiConfig.models];
       importedAiBaseUrl = aiConfig.baseUrl;
       renderAiConfigStatus();
-      renderJobs(latestJobs);
+      await refreshJobs?.({ quiet: true });
       showToast("Konfigurasi AI berhasil disimpan.");
     } catch (error) {
       elements.aiConfigWarning.textContent = error.message;
@@ -512,8 +512,8 @@ export function createConfigurationController({
       };
       importedAiModels = [];
       importedAiBaseUrl = "";
-      renderJobs(latestJobs);
       renderAiConfigStatus();
+      await refreshJobs?.({ quiet: true });
       elements.aiBaseUrl.value = "";
       elements.aiToken.value = "";
       renderImportedModels();

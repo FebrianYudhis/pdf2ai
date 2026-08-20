@@ -316,6 +316,31 @@ export class AiResultStore {
       .map(publicResult);
   }
 
+  countForJob(jobId) {
+    if (!jobId) {
+      return 0;
+    }
+    let count = 0;
+    for (const result of this.results.values()) {
+      if (result.jobId === jobId) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
+  hasForJob(jobId) {
+    if (!jobId) {
+      return false;
+    }
+    for (const result of this.results.values()) {
+      if (result.jobId === jobId) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   get(id) {
     if (!validId(id)) {
       throw new AiError(404, "Hasil AI tidak ditemukan.");

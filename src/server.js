@@ -755,7 +755,7 @@ export async function buildServer({
     const folderJobs = jobs
       .list()
       .filter((job) => job.folderId === folder.id)
-      .map((job) => serializeJob(job, folders));
+      .map((job) => serializeJob(job, folders, aiResults));
     return {
       folder: serializeFolder(folder, folderJobs.length),
       jobs: folderJobs,
@@ -835,7 +835,7 @@ export async function buildServer({
   app.post("/v1/jobs", async (request, reply) => {
     const job = await receiveJob(request);
     reply.header("Location", `/v1/jobs/${job.id}`);
-    return reply.code(202).send({ job: serializeJob(job, folders) });
+    return reply.code(202).send({ job: serializeJob(job, folders, aiResults) });
   });
 
   app.post("/v1/queue/pause", async () => {
@@ -849,17 +849,17 @@ export async function buildServer({
   });
 
   app.get("/v1/jobs", async () => ({
-    jobs: jobs.list().map((job) => serializeJob(job, folders)),
+    jobs: jobs.list().map((job) => serializeJob(job, folders, aiResults)),
     stats: jobs.stats(),
   }));
 
   app.get("/v1/jobs/:id", async (request) => ({
-    job: serializeJob(jobs.get(request.params.id), folders),
+    job: serializeJob(jobs.get(request.params.id), folders, aiResults),
   }));
 
   app.post("/v1/jobs/:id/cancel", async (request) => {
     const job = await jobs.cancel(request.params.id);
-    return { job: serializeJob(job, folders) };
+    return { job: serializeJob(job, folders, aiResults) };
   });
 
   app.patch(
@@ -886,7 +886,7 @@ export async function buildServer({
         folders.get(request.body.folderId);
       }
       const job = await jobs.move(request.params.id, request.body.folderId);
-      return { job: serializeJob(job, folders) };
+      return { job: serializeJob(job, folders, aiResults) };
     },
   );
 

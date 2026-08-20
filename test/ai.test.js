@@ -4,10 +4,14 @@ import test from "node:test";
 
 import {
   AiError,
+  AiResultStore,
   createAiCompletion,
   fetchAiModels,
   normalizeAiBaseUrl,
 } from "../src/ai.js";
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 test("Base URL AI dinormalisasi dan kredensial URL ditolak", () => {
   assert.equal(normalizeAiBaseUrl("https://api.example.com/v1/"), "https://api.example.com/v1");
@@ -137,3 +141,32 @@ test("client AI menerima SSE dari provider compatible yang tetap melakukan strea
     usage: { total_tokens: 9 },
   });
 });
+
+test("AiResultStore dapat menghitung dan mendeteksi hasil AI per job", async (t) => {
+  const directory = mkdtempSync(join(tmpdir(), "pdf2ai-ai-store-test-"));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+
+  const store = new AiResultStore({ directory });
+  await store.init();
+
+  const jobId = "11111111-1111-4111-8111-111111111111";
+  assert.equal(store.countForJob(jobId), 0);
+  assert.equal(store.hasForJob(jobId), false);
+
+  await store.save({
+    job: { id: jobId, originalName: "doc.pdf" },
+    model: "gpt-model",
+    prompt: "Apa intinya?",
+    completion: {
+      content: "Inti dokumen...",
+      providerId: "test-id",
+      providerModel: "gpt-model",
+    },
+  });
+
+  assert.equal(store.countForJob(jobId), 1);
+  assert.equal(store.hasForJob(jobId), true);
+  assert.equal(store.countForJob("22222222-2222-4222-8222-222222222222"), 0);
+  assert.equal(store.hasForJob("22222222-2222-4222-8222-222222222222"), false);
+});
+

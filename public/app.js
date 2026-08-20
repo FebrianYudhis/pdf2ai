@@ -43,34 +43,37 @@ let currentAiJob = null;
 const pendingAiRequests = new Map();
 let aiErrorAlertQueue = Promise.resolve();
 
-function getActiveAlertTarget() {
-  const openDialogs = document.querySelectorAll("dialog[open]");
-  return openDialogs.item(openDialogs.length - 1) ?? document.body;
-}
-
-function getActiveToastRegion() {
-  const target = getActiveAlertTarget();
-  if (target === document.body) {
-    return elements.toastRegion;
+if (elements.toastRegion && typeof elements.toastRegion.showPopover === "function") {
+  try {
+    elements.toastRegion.showPopover();
+  } catch {
+    // fallback if browser doesn't support popover
   }
-
-  let region = target.querySelector(":scope > .modal-toast-region");
-  if (!region) {
-    region = document.createElement("div");
-    region.className = "toast-region modal-toast-region";
-    region.setAttribute("aria-live", "polite");
-    region.setAttribute("aria-atomic", "true");
-    target.append(region);
-  }
-  return region;
 }
 
 function showToast(message, type = "success") {
   const toast = document.createElement("div");
   toast.className = `toast ${type === "error" ? "error" : ""}`;
   toast.textContent = message;
-  getActiveToastRegion().append(toast);
-  window.setTimeout(() => toast.remove(), 4200);
+  elements.toastRegion?.append(toast);
+
+  if (elements.toastRegion && typeof elements.toastRegion.showPopover === "function") {
+    try {
+      elements.toastRegion.hidePopover();
+    } catch {}
+    try {
+      elements.toastRegion.showPopover();
+    } catch {}
+  }
+
+  window.setTimeout(() => {
+    toast.remove();
+    if (elements.toastRegion && elements.toastRegion.children.length === 0) {
+      try {
+        elements.toastRegion.hidePopover();
+      } catch {}
+    }
+  }, 4200);
 }
 
 async function copyText(value, successMessage) {
@@ -88,7 +91,8 @@ function showAiRequestError(job, error) {
     .catch(() => undefined)
     .then(() =>
       Swal.fire({
-        target: getActiveAlertTarget(),
+        target: document.body,
+        topLayer: true,
         icon: "error",
         title: "AI gagal menjawab",
         text: `${job.originalName}: ${message}`,
@@ -341,7 +345,8 @@ function visibleJobs(jobs) {
 
 async function createVirtualFolder() {
   const result = await Swal.fire({
-    target: getActiveAlertTarget(),
+    target: document.body,
+    topLayer: true,
     title: "Buat folder baru",
     text: "Folder hanya mengelompokkan dokumen secara virtual.",
     input: "text",
@@ -384,7 +389,8 @@ async function manageCurrentFolder() {
     return;
   }
   const choice = await Swal.fire({
-    target: getActiveAlertTarget(),
+    target: document.body,
+    topLayer: true,
     title: folder.name,
     text: `${folder.jobCount} dokumen berada di folder ini.`,
     icon: "info",
@@ -401,7 +407,8 @@ async function manageCurrentFolder() {
 
   if (choice.isConfirmed) {
     const renamed = await Swal.fire({
-      target: getActiveAlertTarget(),
+      target: document.body,
+      topLayer: true,
       title: "Ubah nama folder",
       input: "text",
       inputValue: folder.name,
@@ -458,7 +465,8 @@ async function moveJobToFolder(job) {
     inputOptions[folder.id] = folder.name;
   }
   const result = await Swal.fire({
-    target: getActiveAlertTarget(),
+    target: document.body,
+    topLayer: true,
     title: "Pindahkan dokumen",
     text: job.originalName,
     input: "select",
@@ -600,6 +608,33 @@ function renderJobs(jobs) {
       folderBadge.title = `Folder: ${job.folder.name}`;
       metaRow.append(folderBadge);
     }
+    const isPendingAi = pendingAiRequests.has(job.id);
+    const hasAi = Boolean(job.hasAiResults || (job.aiResultsCount ?? 0) > 0);
+    if (isPendingAi || hasAi) {
+      const aiBadge = document.createElement("button");
+      aiBadge.type = "button";
+      aiBadge.className = `file-ai-badge${isPendingAi ? " is-pending" : ""}`;
+      const count = job.aiResultsCount ?? 1;
+      aiBadge.title = isPendingAi
+        ? "Jawaban AI sedang diproses di latar belakang"
+        : `Dokumen ini sudah ditanyakan ke AI (${count} jawaban). Klik untuk melihat riwayat atau bertanya lagi.`;
+      const aiIcon = actionIcon("ai");
+      aiIcon.classList.add("file-ai-badge-icon");
+      const aiText = document.createElement("span");
+      aiText.textContent = isPendingAi
+        ? "AI menjawab…"
+        : `Tanya AI (${count})`;
+      aiBadge.append(aiIcon, aiText);
+      if (job.status === "completed") {
+        aiBadge.addEventListener("click", (event) => {
+          event.stopPropagation();
+          openAskAi(job);
+        });
+      } else {
+        aiBadge.style.cursor = "default";
+      }
+      metaRow.append(aiBadge);
+    }
     details.append(name, metaRow);
     if (job.status === "failed" && job.error) {
       const error = document.createElement("small");
@@ -635,20 +670,18 @@ function renderJobs(jobs) {
           "result",
         ),
       );
-      if (configuration.aiConfig.configured) {
-        const aiRequestPending = pendingAiRequests.has(job.id);
-        const askAiButton = actionButton(
-          aiRequestPending ? "AI menjawab…" : "Tanya AI",
-          "job-menu-action ai",
-          () => openAskAi(job),
-          aiRequestPending
-            ? "Jawaban sedang diproses di latar belakang"
-            : "Ajukan pertanyaan tentang dokumen kepada AI",
-          "ai",
-        );
-        askAiButton.setAttribute("aria-busy", String(aiRequestPending));
-        actionButtons.push(askAiButton);
-      }
+      const aiRequestPending = pendingAiRequests.has(job.id);
+      const askAiButton = actionButton(
+        aiRequestPending ? "AI menjawab…" : "Tanya AI",
+        "job-menu-action ai",
+        () => openAskAi(job),
+        aiRequestPending
+          ? "Jawaban sedang diproses di latar belakang"
+          : "Ajukan pertanyaan tentang dokumen kepada AI",
+        "ai",
+      );
+      askAiButton.setAttribute("aria-busy", String(aiRequestPending));
+      actionButtons.push(askAiButton);
       actionButtons.push(
         actionButton(
           "Fetch Data",
@@ -764,7 +797,8 @@ async function checkHealth() {
 
 async function confirmDeletion({ title, text, confirmButtonText = "Hapus" }) {
   const result = await Swal.fire({
-    target: getActiveAlertTarget(),
+    target: document.body,
+    topLayer: true,
     title,
     text,
     icon: "warning",
@@ -931,16 +965,26 @@ async function openAskAi(job) {
         ),
       ]
     : configuration.aiConfig.models;
-  elements.askAiModel.replaceChildren(
-    ...orderedModels.map(
-      (model) => new Option(
-        model === configuration.aiConfig.defaultModel
-          ? `${model} (default)`
-          : model,
-        model,
+  if (orderedModels.length === 0) {
+    elements.askAiModel.replaceChildren(new Option("Belum ada model AI", ""));
+    elements.askAiWarning.textContent =
+      "Integrasi AI belum dikonfigurasi. Silakan buka Pengaturan > Integrasi AI untuk menghubungkan model AI Anda.";
+    elements.askAiWarning.hidden = false;
+    elements.executeAskAi.disabled = true;
+  } else {
+    elements.askAiWarning.hidden = true;
+    elements.askAiModel.replaceChildren(
+      ...orderedModels.map(
+        (model) =>
+          new Option(
+            model === configuration.aiConfig.defaultModel
+              ? `${model} (default)`
+              : model,
+            model,
+          ),
       ),
-    ),
-  );
+    );
+  }
   elements.askAiDialog.showModal();
   syncAskAiDialogState(job.id);
   await loadAiResults(job.id);
@@ -988,11 +1032,13 @@ async function executeAskAi() {
       },
     );
     await response.json();
+    completed = true;
+    job.hasAiResults = true;
+    job.aiResultsCount = (job.aiResultsCount ?? 0) + 1;
     if (currentAiJob?.id === job.id) {
       await loadAiResults(job.id);
       elements.askAiProgress.textContent = "Jawaban berhasil disimpan.";
     }
-    completed = true;
     showToast(`AI selesai menjawab ${job.originalName}.`);
   } catch (error) {
     showAiRequestError(job, error);
@@ -1205,7 +1251,8 @@ function openFetchData(job) {
 async function cancelJob(job) {
   const isProcessing = job.status === "processing";
   const result = await Swal.fire({
-    target: getActiveAlertTarget(),
+    target: document.body,
+    topLayer: true,
     title: isProcessing ? "Batalkan pemrosesan?" : "Batalkan antrean dokumen?",
     text: `Hentikan pemrosesan “${job.originalName}”?`,
     icon: "warning",

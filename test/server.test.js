@@ -462,10 +462,9 @@ test("dashboard, sub-navbar docs, Scalar API reference, dan health tersedia", as
   assert.doesNotMatch(appScript.body, /progress-track/);
   assert.match(appScript.body, /pendingAiRequests/);
   assert.match(appScript.body, /AI gagal menjawab/);
-  assert.match(appScript.body, /formatLastUpdated/);
-  assert.match(appScript.body, /getActiveAlertTarget/);
-  assert.match(appScript.body, /modal-toast-region/);
-  assert.match(mainStyles.body, /\.modal-toast-region/);
+  assert.match(appScript.body, /topLayer/);
+  assert.match(appScript.body, /toastRegion/);
+  assert.match(mainStyles.body, /\.toast-region/);
   assert.match(mainStyles.body, /\.queue-paused-banner\[hidden\]/);
   assert.match(mainStyles.body, /\.job-card\.is-action-open/);
   assert.match(mainStyles.body, /\.status-badge\.processing::before/);
@@ -476,6 +475,8 @@ test("dashboard, sub-navbar docs, Scalar API reference, dan health tersedia", as
   assert.match(mainStyles.body, /\.api-key-example-card/);
   assert.match(page.body, /id="api-key-badge"/);
   assert.match(page.body, /id="api-key-specs"/);
+  assert.match(mainStyles.body, /\.file-ai-badge/);
+  assert.match(appScript.body, /file-ai-badge/);
   assert.match(appScript.body, /jobActionMenu/);
   assert.match(appScript.body, /job-action-trigger/);
   assert.match(appScript.body, /actionIconPaths/);
@@ -1004,6 +1005,15 @@ test("konfigurasi Tanya AI, eksekusi, API key, dan hasil persisten", async (t) =
   const jobId = upload.json().job.id;
   await app.jobs.waitForIdle();
 
+  const initialJobDetail = await app.inject({
+    method: "GET",
+    url: `/v1/jobs/${jobId}`,
+    headers: { cookie },
+  });
+  assert.equal(initialJobDetail.statusCode, 200);
+  assert.equal(initialJobDetail.json().job.hasAiResults, false);
+  assert.equal(initialJobDetail.json().job.aiResultsCount, 0);
+
   const unknownModel = await app.inject({
     method: "POST",
     url: `/v1/jobs/${jobId}/ai`,
@@ -1037,6 +1047,15 @@ test("konfigurasi Tanya AI, eksekusi, API key, dan hasil persisten", async (t) =
   assert.equal(result.resultUrl, `${aiResultsUrl}/${result.id}`);
   assert.equal(completionRequests[0].markdown, "# Invoice\n\nTotal: Rp100.000");
   assert.equal(completionRequests[0].token, "token-provider-rahasia");
+
+  const jobDetailAfterAi = await app.inject({
+    method: "GET",
+    url: `/v1/jobs/${jobId}`,
+    headers: { cookie },
+  });
+  assert.equal(jobDetailAfterAi.statusCode, 200);
+  assert.equal(jobDetailAfterAi.json().job.hasAiResults, true);
+  assert.equal(jobDetailAfterAi.json().job.aiResultsCount, 1);
 
   const otherUploadData = multipartPdf("file", "%PDF-1.7\nother", "other.pdf");
   const otherUpload = await app.inject({

@@ -1188,6 +1188,58 @@ a:focus-visible,
   white-space: nowrap;
 }
 
+.file-ai-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 140px;
+  overflow: hidden;
+  padding: 2px 7px;
+  border: 1px solid var(--secondary);
+  border-radius: 999px;
+  background: var(--secondary-soft);
+  color: var(--secondary);
+  font-family: inherit;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  appearance: none;
+  transition: transform 0.15s ease, opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.file-ai-badge:hover {
+  opacity: 0.85;
+  transform: translateY(-0.5px);
+}
+
+.file-ai-badge:focus-visible {
+  outline: 2px solid var(--secondary);
+  outline-offset: 1px;
+}
+
+.file-ai-badge svg,
+.file-ai-badge-icon {
+  width: 9px;
+  height: 9px;
+  fill: currentColor;
+  flex: 0 0 auto;
+}
+
+.file-ai-badge.is-pending {
+  border-color: var(--info);
+  background: var(--info-soft);
+  color: var(--info);
+  cursor: wait;
+}
+
+.file-ai-badge.is-pending svg,
+.file-ai-badge.is-pending .file-ai-badge-icon {
+  animation: spin 1s linear infinite;
+}
+
 .status-badge {
   display: inline-flex;
   align-items: center;
@@ -2956,21 +3008,27 @@ a:focus-visible,
   font-size: 10px;
 }
 
-.toast-region {
+.swal2-container {
+  z-index: 2147483647 !important;
+}
+
+.toast-region,
+.toast-region:popover-open {
   position: fixed;
-  right: 24px;
-  bottom: 24px;
-  z-index: 100;
+  inset: auto 24px 24px auto;
+  width: auto;
+  height: auto;
+  max-width: calc(100vw - 48px);
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  z-index: 2147483647;
   display: grid;
   gap: 10px;
   pointer-events: none;
-}
-
-.modal-toast-region {
-  position: absolute;
-  right: 18px;
-  bottom: 18px;
-  z-index: 2147483000;
+  overflow: visible;
 }
 
 .toast {
@@ -3324,16 +3382,13 @@ a:focus-visible,
     justify-content: flex-start;
   }
 
-  .toast-region {
+  .toast-region,
+  .toast-region:popover-open {
+    inset: auto 14px 14px 14px;
     right: 14px;
     bottom: 14px;
     left: 14px;
-  }
-
-  .modal-toast-region {
-    right: 12px;
-    bottom: 12px;
-    left: 12px;
+    max-width: calc(100vw - 28px);
   }
 
   .toast {

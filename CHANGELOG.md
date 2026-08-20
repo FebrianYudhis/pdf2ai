@@ -4,6 +4,23 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) dan versi mengikuti
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.2] - 2026-08-20
+
+### Added
+
+- Badge indikator interaktif **"Tanya AI"** pada kartu dokumen (`.file-ai-badge`) yang menampilkan jumlah riwayat pertanyaan yang telah dilakukan (`Tanya AI (N)`), status animasi saat proses AI berlangsung (`AI menjawab…`), serta dapat diklik langsung untuk membuka riwayat jawaban atau mengajukan pertanyaan baru.
+- Properti `hasAiResults` (boolean) dan `aiResultsCount` (integer) pada serialisasi payload dokumen (`/v1/jobs`, `/v1/jobs/:id`, dan `/v1/folders/:id`) serta pembaruan skema OpenAPI.
+- Metode pembantu `countForJob(jobId)` dan `hasForJob(jobId)` pada `AiResultStore`.
+
+### Changed
+
+- Menu aksi dokumen kini selalu menampilkan tombol **"Tanya AI"** untuk semua dokumen yang telah selesai diproses tanpa disembunyikan saat AI belum dikonfigurasi, dan memberikan petunjuk konfigurasi secara informatif saat dibuka.
+- Alert konfirmasi/pesan (SweetAlert) dan Toast notifikasi kini tetap berada di root `<body>` secara global dengan memanfaatkan `topLayer: true` dan atribut `popover="manual"` pada `#toast-region`, sehingga selalu tampil di lapisan terdepan (*top layer*) di atas modal dialog tanpa perlu disisipkan ke dalam elemen `<dialog>`.
+
+### Fixed
+
+- Memperbaiki error `ReferenceError: renderJobs is not defined` pada `public/configuration-controller.js` saat menyimpan atau menghapus konfigurasi AI dengan memanggil fungsi `refreshJobs` yang diinjeksikan.
+
 ## [1.7.1] - 2026-08-19
 
 ### Changed

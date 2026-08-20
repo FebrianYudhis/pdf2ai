@@ -13,8 +13,13 @@ export function serializeFolder(folder, jobCount = undefined) {
   };
 }
 
-export function serializeJob(job, folders) {
+export function serializeJob(job, folders, aiResults = undefined) {
   const folder = folders?.find(job.folderId);
+  const aiResultsCount = aiResults
+    ? (typeof aiResults.countForJob === "function"
+        ? aiResults.countForJob(job.id)
+        : aiResults.list(job.id).length)
+    : (job.aiResultsCount ?? 0);
   return {
     ...job,
     // Referensi folder yang sudah tidak ada diperlakukan sebagai "Tanpa folder".
@@ -31,6 +36,8 @@ export function serializeJob(job, folders) {
         : null,
     aiModelsUrl: "/v1/ai/models",
     aiResultsUrl: `/v1/jobs/${job.id}/ai`,
+    aiResultsCount,
+    hasAiResults: aiResultsCount > 0,
   };
 }
 

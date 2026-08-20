@@ -508,6 +508,8 @@ export function openApiOptions() {
               "pdfUrl",
               "aiModelsUrl",
               "aiResultsUrl",
+              "aiResultsCount",
+              "hasAiResults",
             ],
             properties: {
               id: { type: "string", format: "uuid" },
@@ -532,6 +534,8 @@ export function openApiOptions() {
               markdownUrl: { type: "string", nullable: true },
               aiModelsUrl: { type: "string" },
               aiResultsUrl: { type: "string" },
+              aiResultsCount: { type: "integer", minimum: 0 },
+              hasAiResults: { type: "boolean" },
             },
           },
           AiModels: {
