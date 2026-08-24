@@ -4,6 +4,21 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) dan versi mengikuti
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.1] - 2026-08-24
+
+### Added
+
+- Indikator status loading visual saat proses **Export Konfigurasi (JSON)** dan **Export Data Lengkap (ZIP)**:
+  - Tombol aksi otomatis dinonaktifkan (*disabled*) dengan teks status `"Mengekspor…"` / `"Mengemas ZIP…"`.
+  - Dialog pemuatan interaktif SweetAlert saat mengemas arsip data dokumen ZIP yang berukuran besar.
+- Mekanisme pemuatan ulang otomatis (*auto-refresh*) `window.location.reload()` setelah proses **Import Konfigurasi** dan **Import Data Dokumen** berhasil, memastikan seluruh pengaturan sistem, model AI, template prompt, serta dokumen antrean langsung ter-load dan tersinkronisasi secara bersih di Dashboard.
+
+### Changed
+
+- Pemisahan tanggung jawab cadangan (*backup separation*):
+  - **Export & Import Konfigurasi (JSON)** kini murni mengelola pengaturan sistem, OCR, provider AI, dan template prompt tanpa menyertakan struktur folder virtual.
+  - Struktur folder virtual (`folders.json`) sepenuhnya dikelola di dalam **Export & Import Data Dokumen Lengkap (ZIP)** bersama dengan data pekerjaan, Markdown, hasil AI, dan berkas PDF asli.
+
 ## [1.9.0] - 2026-08-24
 
 ### Added

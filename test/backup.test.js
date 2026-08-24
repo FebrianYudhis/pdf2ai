@@ -39,9 +39,6 @@ function createTestContext() {
 
 test("exportConfiguration dan importConfiguration berfungsi dengan benar", async () => {
   const ctx = createTestContext();
-  const folderStore = new FolderStore({ path: ctx.folderFile });
-  await folderStore.init();
-  await folderStore.create("Folder Laporan");
 
   const appSettings = {
     ocrDevice: "cpu",
@@ -64,19 +61,15 @@ test("exportConfiguration dan importConfiguration berfungsi dengan benar", async
   const exported = exportConfiguration({
     applicationSettings: appSettings,
     aiConfig,
-    folders: folderStore.list(),
   });
 
   assert.equal(exported.version, 1);
   assert.equal(exported.type, "pdf2ai-config");
-  assert.equal(exported.folders.length, 1);
-  assert.equal(exported.folders[0].name, "Folder Laporan");
+  assert.equal(exported.folders, undefined);
   assert.equal(exported.aiConfig.defaultModel, "gpt-4o");
 
   // Import ke context baru
   const ctx2 = createTestContext();
-  const folderStore2 = new FolderStore({ path: ctx2.folderFile });
-  await folderStore2.init();
 
   const mfaConfig = { secret: "test", ai: null };
   const importResult = await importConfiguration({
@@ -84,12 +77,9 @@ test("exportConfiguration dan importConfiguration berfungsi dengan benar", async
     applicationConfigFile: ctx2.appConfigFile,
     authFile: ctx2.authFile,
     mfaConfig,
-    folderStore: folderStore2,
   });
 
   assert.equal(importResult.ok, true);
-  assert.equal(folderStore2.list().length, 1);
-  assert.equal(folderStore2.list()[0].name, "Folder Laporan");
   assert.equal(importResult.aiConfig.defaultModel, "gpt-4o");
   assert.equal(importResult.applicationSettings.ocrDevice, "cpu");
 });
@@ -263,13 +253,11 @@ test("endpoint API /v1/backup/config dan /v1/backup/data berfungsi via HTTP", as
         aiTimeoutSeconds: 120,
         sessionHours: 24,
       },
-      folders: [{ id: randomUUID(), name: "Folder Baru", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }],
     },
   });
   assert.equal(importConfigRes.statusCode, 200);
   const importConfigBody = JSON.parse(importConfigRes.body);
   assert.equal(importConfigBody.ok, true);
-  assert.equal(importConfigBody.newFoldersCount, 1);
 
   // 3. Export Data GET
   const dataExportRes = await server.inject({

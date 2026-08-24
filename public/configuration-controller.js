@@ -526,6 +526,11 @@ export function createConfigurationController({
   }
 
   async function exportConfigurationData() {
+    const originalText = elements.exportConfigBtn?.textContent;
+    if (elements.exportConfigBtn) {
+      elements.exportConfigBtn.disabled = true;
+      elements.exportConfigBtn.textContent = "Mengekspor…";
+    }
     try {
       const response = await api("/v1/backup/config/export");
       const blob = await response.blob();
@@ -539,6 +544,11 @@ export function createConfigurationController({
       showToast("Konfigurasi berhasil diexport.");
     } catch (error) {
       showToast(error.message, "error");
+    } finally {
+      if (elements.exportConfigBtn) {
+        elements.exportConfigBtn.disabled = false;
+        elements.exportConfigBtn.textContent = originalText;
+      }
     }
   }
 
@@ -560,7 +570,7 @@ export function createConfigurationController({
 
       const confirm = await Swal.fire({
         title: "Terapkan konfigurasi?",
-        text: "Pengaturan aplikasi, AI provider, template, dan folder akan diperbarui.",
+        text: "Pengaturan aplikasi, AI provider, dan prompt template akan diperbarui.",
         icon: "question",
         showCancelButton: true,
         confirmButtonText: "Ya, terapkan",
@@ -573,6 +583,7 @@ export function createConfigurationController({
 
       Swal.fire({
         title: "Mengimpor konfigurasi…",
+        text: "Menerapkan konfigurasi dan memperbarui pengaturan sistem.",
         allowOutsideClick: false,
         didOpen: () => Swal.showLoading(),
       });
@@ -584,17 +595,16 @@ export function createConfigurationController({
       });
       const result = await response.json();
 
-      await Promise.allSettled([
-        refreshApplicationConfig(),
-        refreshAiConfig(),
-        refreshJobs?.({ quiet: true }),
-      ]);
-
-      Swal.fire({
+      await Swal.fire({
         title: "Berhasil!",
-        text: result.message || "Konfigurasi berhasil diterapkan.",
+        text:
+          (result.message || "Konfigurasi berhasil diterapkan.") +
+          " Halaman akan dimuat ulang untuk memperbarui seluruh tampilan.",
         icon: "success",
+        confirmButtonText: "Muat Ulang",
+        allowOutsideClick: false,
       });
+      window.location.reload();
     } catch (error) {
       Swal.fire({
         title: "Gagal mengimpor konfigurasi",
@@ -607,9 +617,22 @@ export function createConfigurationController({
   }
 
   async function exportCompleteData() {
+    const originalText = elements.exportDataBtn?.textContent;
+    if (elements.exportDataBtn) {
+      elements.exportDataBtn.disabled = true;
+      elements.exportDataBtn.textContent = "Mengemas ZIP…";
+    }
+    Swal.fire({
+      title: "Menyiapkan arsip ZIP…",
+      text: "Mohon tunggu sebentar, seluruh riwayat data sedang dikemas.",
+      allowOutsideClick: false,
+      didOpen: () => Swal.showLoading(),
+    });
     try {
       const includePdfs = elements.backupIncludePdf.checked ? "true" : "false";
-      const response = await api(`/v1/backup/data/export?includePdfs=${includePdfs}`);
+      const response = await api(
+        `/v1/backup/data/export?includePdfs=${includePdfs}`,
+      );
       const blob = await response.blob();
       const dateStr = new Date().toISOString().slice(0, 10);
       const url = URL.createObjectURL(blob);
@@ -618,9 +641,19 @@ export function createConfigurationController({
       anchor.download = `pdf2ai-data-${dateStr}.zip`;
       anchor.click();
       URL.revokeObjectURL(url);
+      Swal.close();
       showToast("Data arsip berhasil diunduh.");
     } catch (error) {
-      showToast(error.message, "error");
+      Swal.fire({
+        title: "Gagal mengekspor data",
+        text: error.message,
+        icon: "error",
+      });
+    } finally {
+      if (elements.exportDataBtn) {
+        elements.exportDataBtn.disabled = false;
+        elements.exportDataBtn.textContent = originalText;
+      }
     }
   }
 
@@ -661,18 +694,20 @@ export function createConfigurationController({
       });
       const result = await response.json();
 
-      await refreshJobs?.();
-
-      Swal.fire({
+      await Swal.fire({
         title: "Data Berhasil Dipulihkan!",
         html: `<p>${result.message || "Data berhasil diimpor."}</p>
                <ul style="text-align: left; margin: 12px auto; display: inline-block;">
                  <li><strong>${result.importedJobs ?? 0}</strong> Dokumen / Job</li>
                  <li><strong>${result.importedAiResults ?? 0}</strong> Hasil Analisis AI</li>
                  <li><strong>${result.importedFolders ?? 0}</strong> Folder Baru</li>
-               </ul>`,
+               </ul>
+               <p style="margin-top: 10px; font-size: 13px; color: var(--muted, #666);">Halaman akan dimuat ulang untuk memuat seluruh konten.</p>`,
         icon: "success",
+        confirmButtonText: "Muat Ulang",
+        allowOutsideClick: false,
       });
+      window.location.reload();
     } catch (error) {
       Swal.fire({
         title: "Gagal mengimpor data",

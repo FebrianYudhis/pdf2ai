@@ -24,7 +24,7 @@ export class BackupError extends Error {
   }
 }
 
-export function exportConfiguration({ applicationSettings, aiConfig, folders }) {
+export function exportConfiguration({ applicationSettings, aiConfig }) {
   return {
     version: 1,
     type: "pdf2ai-config",
@@ -36,7 +36,6 @@ export function exportConfiguration({ applicationSettings, aiConfig, folders }) 
       defaultModel: aiConfig?.defaultModel ?? "",
       templates: aiConfig?.templates ?? [],
     },
-    folders: Array.isArray(folders) ? folders : [],
   };
 }
 
@@ -45,7 +44,6 @@ export async function importConfiguration({
   applicationConfigFile,
   authFile,
   mfaConfig,
-  folderStore,
 }) {
   if (!configData || typeof configData !== "object") {
     throw new BackupError(400, "Format data konfigurasi tidak valid.");
@@ -53,11 +51,15 @@ export async function importConfiguration({
 
   let updatedAppSettings = null;
   let updatedAiConfig = null;
-  let updatedFoldersCount = 0;
 
   // 1. Simpan Application Settings
-  if (configData.applicationSettings && typeof configData.applicationSettings === "object") {
-    const normalized = normalizeApplicationSettings(configData.applicationSettings);
+  if (
+    configData.applicationSettings &&
+    typeof configData.applicationSettings === "object"
+  ) {
+    const normalized = normalizeApplicationSettings(
+      configData.applicationSettings,
+    );
     updatedAppSettings = await saveApplicationSettings(
       applicationConfigFile,
       normalized,
@@ -65,12 +67,22 @@ export async function importConfiguration({
   }
 
   // 2. Simpan AI Config (jika ada data dan MFA/auth terpasang)
-  if (configData.aiConfig && typeof configData.aiConfig === "object" && mfaConfig) {
+  if (
+    configData.aiConfig &&
+    typeof configData.aiConfig === "object" &&
+    mfaConfig
+  ) {
     const aiInput = configData.aiConfig;
-    if (aiInput.baseUrl && Array.isArray(aiInput.models) && aiInput.models.length > 0) {
+    if (
+      aiInput.baseUrl &&
+      Array.isArray(aiInput.models) &&
+      aiInput.models.length > 0
+    ) {
       const baseUrl = normalizeAiBaseUrl(aiInput.baseUrl);
       const models = [
-        ...new Set(aiInput.models.map((m) => String(m).trim()).filter(Boolean)),
+        ...new Set(
+          aiInput.models.map((m) => String(m).trim()).filter(Boolean),
+        ),
       ];
       const defaultModel =
         aiInput.defaultModel && models.includes(aiInput.defaultModel)
@@ -91,7 +103,10 @@ export async function importConfiguration({
         ...mfaConfig,
         ai: {
           baseUrl,
-          token: mfaConfig.ai?.baseUrl === baseUrl ? (mfaConfig.ai?.token ?? "") : "",
+          token:
+            mfaConfig.ai?.baseUrl === baseUrl
+              ? (mfaConfig.ai?.token ?? "")
+              : "",
           models,
           defaultModel,
           templates,
@@ -104,19 +119,10 @@ export async function importConfiguration({
     }
   }
 
-  // 3. Import Folder structure
-  if (Array.isArray(configData.folders) && folderStore) {
-    const beforeCount = folderStore.list().length;
-    await folderStore.importFolders(configData.folders);
-    const afterCount = folderStore.list().length;
-    updatedFoldersCount = afterCount - beforeCount;
-  }
-
   return {
     ok: true,
     applicationSettings: updatedAppSettings,
     aiConfig: updatedAiConfig,
-    newFoldersCount: updatedFoldersCount,
   };
 }
 

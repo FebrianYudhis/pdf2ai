@@ -409,7 +409,7 @@ const routeDocumentation = {
   "GET /v1/backup/config/export": {
     tags: ["Backup"],
     summary: "Export konfigurasi aplikasi & AI",
-    description: "Mengunduh file JSON berisi pengaturan aplikasi, AI provider, template prompt, dan struktur folder.",
+    description: "Mengunduh file JSON berisi pengaturan aplikasi, AI provider, dan template prompt.",
     operationId: "exportConfig",
     security: apiSecurity,
     produces: ["application/json"],
@@ -438,7 +438,6 @@ const routeDocumentation = {
         properties: {
           ok: { type: "boolean" },
           message: { type: "string" },
-          newFoldersCount: { type: "integer" },
         },
       },
       400: errorResponse,

@@ -1057,7 +1057,6 @@ export async function buildServer({
     const data = exportConfiguration({
       applicationSettings,
       aiConfig: mfaConfig?.ai,
-      folders: folders.list(),
     });
     const dateStr = new Date().toISOString().slice(0, 10);
     reply.header(
@@ -1078,7 +1077,6 @@ export async function buildServer({
       applicationConfigFile,
       authFile,
       mfaConfig,
-      folderStore: folders,
     });
     if (result.applicationSettings) {
       applicationSettings = result.applicationSettings;
@@ -1089,7 +1087,6 @@ export async function buildServer({
     return {
       ok: true,
       message: "Konfigurasi berhasil diimpor.",
-      newFoldersCount: result.newFoldersCount,
       applicationConfig: publicApplicationConfig(),
       aiConfig: publicAiConfig(),
     };
