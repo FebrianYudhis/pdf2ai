@@ -4,6 +4,14 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) dan versi mengikuti
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.2] - 2026-08-24
+
+### Changed
+
+- Penyempurnaan tampilan badge folder pada kartu dokumen:
+  - Badge folder (`.file-folder-badge`) kini hanya ditampilkan saat pengguna berada di tampilan tab **"Semua dokumen"** untuk memberikan konteks lokasi folder dokumen.
+  - Badge folder otomatis disembunyikan saat pengguna sedang membuka/memfilter folder tertentu untuk menjaga tampilan kartu dokumen tetap bersih dan tidak redundan.
+
 ## [1.9.1] - 2026-08-24
 
 ### Added

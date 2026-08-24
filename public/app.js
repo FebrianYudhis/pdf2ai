@@ -782,7 +782,7 @@ function renderJobs(jobs) {
     const metaRow = document.createElement("div");
     metaRow.className = "file-meta-row";
     metaRow.append(meta);
-    if (job.folder) {
+    if (job.folder && activeFolderFilter === "all") {
       const folderBadge = document.createElement("span");
       folderBadge.className = "file-folder-badge";
       folderBadge.textContent = job.folder.name;
