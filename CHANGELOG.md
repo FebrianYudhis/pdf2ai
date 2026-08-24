@@ -4,6 +4,15 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) dan versi mengikuti
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.3] - 2026-08-24
+
+### Changed
+
+- Restrukturisasi dan penyederhanaan dokumentasi utama ([`README.md`](README.md)):
+  - Mengubah format README menjadi lebih ringkas, elegan, dan ramah pengguna (*user-friendly*).
+  - Mengarahkan seluruh detail spesifikasi teknis dan referensi integrasi REST API langsung ke portal dokumentasi bawaan di dashboard: **Simple Docs** (`/docs`) dan **Scalar API Reference** (`/docs/scalar`).
+  - Menghilangkan ratusan baris payload cURL mentah dan potongan kode repetitif dari README agar lebih berfokus pada fitur utama, persyaratan sistem, panduan instalasi cepat (*quick start*), serta panduan penggunaan dashboard.
+
 ## [1.9.2] - 2026-08-24
 
 ### Changed
