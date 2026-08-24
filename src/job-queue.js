@@ -119,6 +119,31 @@ export class JobQueue {
     this.#schedule();
   }
 
+  async reload() {
+    const entries = await readdir(this.dataDirectory, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory() || !validJobId(entry.name)) {
+        continue;
+      }
+      if (this.jobs.has(entry.name) && this.activeJob?.id === entry.name) {
+        continue;
+      }
+      try {
+        const metadata = JSON.parse(
+          await readFile(this.#metadataPath(entry.name), "utf8"),
+        );
+        if (metadata.id === entry.name && validJobId(metadata.id)) {
+          this.jobs.set(metadata.id, metadata);
+        }
+      } catch (error) {
+        this.logger.warn?.(
+          { err: error, jobId: entry.name },
+          "Metadata job tidak dapat dibaca saat reload",
+        );
+      }
+    }
+  }
+
   async create({ originalName, stream, validate, folderId = null }) {
     const id = randomUUID();
     const directory = this.#jobDirectory(id);

@@ -73,6 +73,8 @@
           <a href="#list-ai-results"><span class="nav-method get">GET</span> Daftar hasil AI</a>
           <a href="#get-ai-result"><span class="nav-method get">GET</span> Detail hasil AI</a>
           <a href="#delete-job"><span class="nav-method delete">DEL</span> Hapus job</a>
+          <a href="#backup-config"><span class="nav-method get">GET</span> Backup Konfigurasi</a>
+          <a href="#backup-data"><span class="nav-method get">GET</span> Backup Data (ZIP)</a>
         </nav>
 
         <p class="docs-sidebar-label">REFERENSI</p>
@@ -788,6 +790,92 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
   {{BASE_URL}}/v1/jobs/JOB_ID</pre>
           </div>
           <p class="response-note"><strong>204 No Content</strong> jika penghapusan berhasil.</p>
+        </section>
+
+        <section class="docs-section endpoint-section" id="backup-config">
+          <div class="endpoint-title">
+            <span class="method-badge get">GET</span>
+            <code>/v1/backup/config/export</code>
+            <span class="auth-badge">API KEY</span>
+          </div>
+          <p>
+            Mengunduh konfigurasi aplikasi, OCR settings, provider AI, prompt templates, dan struktur folder dalam format JSON.
+          </p>
+
+          <div class="code-sample docs-code-sample">
+            <div class="code-sample-header">
+              <span>cURL · Export Config</span>
+              <button class="code-copy-button" type="button" data-copy="#export-config-code">Salin</button>
+            </div>
+            <pre id="export-config-code" data-code tabindex="0">curl -H "X-API-Key: $PDF2AI_API_KEY" \
+  {{BASE_URL}}/v1/backup/config/export -o pdf2ai-config.json</pre>
+          </div>
+
+          <div class="endpoint-title" style="margin-top: 28px;">
+            <span class="method-badge post">POST</span>
+            <code>/v1/backup/config/import</code>
+            <span class="auth-badge">API KEY</span>
+          </div>
+          <p>
+            Menerapkan konfigurasi dari file JSON ke aplikasi dan memperbarui daftar folder.
+          </p>
+
+          <div class="code-sample docs-code-sample">
+            <div class="code-sample-header">
+              <span>cURL · Import Config</span>
+              <button class="code-copy-button" type="button" data-copy="#import-config-code">Salin</button>
+            </div>
+            <pre id="import-config-code" data-code tabindex="0">curl -X POST \
+  -H "X-API-Key: $PDF2AI_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d @pdf2ai-config.json \
+  {{BASE_URL}}/v1/backup/config/import</pre>
+          </div>
+        </section>
+
+        <section class="docs-section endpoint-section" id="backup-data">
+          <div class="endpoint-title">
+            <span class="method-badge get">GET</span>
+            <code>/v1/backup/data/export</code>
+            <span class="auth-badge">API KEY</span>
+          </div>
+          <p>
+            Mengunduh arsip ZIP lengkap yang mencakup seluruh riwayat dokumen, Markdown (<code>result.md</code>), hasil analisis AI, metadata antrean, dan file PDF asli.
+          </p>
+
+          <div class="code-sample docs-code-sample">
+            <div class="code-sample-header">
+              <span>cURL · Export Data (.zip)</span>
+              <button class="code-copy-button" type="button" data-copy="#export-data-code">Salin</button>
+            </div>
+            <pre id="export-data-code" data-code tabindex="0"># Export lengkap (termasuk PDF)
+curl -H "X-API-Key: $PDF2AI_API_KEY" \
+  {{BASE_URL}}/v1/backup/data/export -o pdf2ai-backup.zip
+
+# Export ringan (tanpa PDF, hanya Markdown & AI)
+curl -H "X-API-Key: $PDF2AI_API_KEY" \
+  "{{BASE_URL}}/v1/backup/data/export?includePdfs=false" -o pdf2ai-backup.zip</pre>
+          </div>
+
+          <div class="endpoint-title" style="margin-top: 28px;">
+            <span class="method-badge post">POST</span>
+            <code>/v1/backup/data/import</code>
+            <span class="auth-badge">API KEY</span>
+          </div>
+          <p>
+            Memulihkan atau mengimpor data dari file ZIP ke antrean dan riwayat dashboard tanpa merestart server.
+          </p>
+
+          <div class="code-sample docs-code-sample">
+            <div class="code-sample-header">
+              <span>cURL · Import Data (.zip)</span>
+              <button class="code-copy-button" type="button" data-copy="#import-data-code">Salin</button>
+            </div>
+            <pre id="import-data-code" data-code tabindex="0">curl -X POST \
+  -H "X-API-Key: $PDF2AI_API_KEY" \
+  -F "file=@pdf2ai-backup.zip" \
+  {{BASE_URL}}/v1/backup/data/import</pre>
+          </div>
         </section>
 
         <section class="docs-section" id="job-model">

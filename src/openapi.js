@@ -396,6 +396,105 @@ const routeDocumentation = {
       409: errorResponse,
     },
   },
+  "GET /v1/backup/config/export": {
+    tags: ["Backup"],
+    summary: "Export konfigurasi aplikasi & AI",
+    description: "Mengunduh file JSON berisi pengaturan aplikasi, AI provider, template prompt, dan struktur folder.",
+    operationId: "exportConfig",
+    security: apiSecurity,
+    produces: ["application/json"],
+    response: {
+      200: {
+        type: "object",
+        description: "File JSON konfigurasi PDF2AI.",
+      },
+      401: errorResponse,
+    },
+  },
+  "POST /v1/backup/config/import": {
+    tags: ["Backup"],
+    summary: "Import konfigurasi aplikasi & AI",
+    description: "Mengunggah dan menerapkan konfigurasi dari file JSON.",
+    operationId: "importConfig",
+    security: apiSecurity,
+    body: {
+      type: "object",
+      description: "Data JSON konfigurasi hasil export.",
+    },
+    response: {
+      200: {
+        type: "object",
+        required: ["ok", "message"],
+        properties: {
+          ok: { type: "boolean" },
+          message: { type: "string" },
+          newFoldersCount: { type: "integer" },
+        },
+      },
+      400: errorResponse,
+      401: errorResponse,
+    },
+  },
+  "GET /v1/backup/data/export": {
+    tags: ["Backup"],
+    summary: "Export data dokumen lengkap",
+    description: "Mengunduh arsip ZIP berisi seluruh riwayat pekerjaan, file Markdown, hasil AI, dan PDF asli.",
+    operationId: "exportData",
+    security: apiSecurity,
+    querystring: {
+      type: "object",
+      properties: {
+        includePdfs: {
+          type: "string",
+          enum: ["true", "false"],
+          default: "true",
+          description: "Set 'false' jika ingin mengabaikan file PDF asli untuk ukuran file lebih kecil.",
+        },
+      },
+    },
+    produces: ["application/zip"],
+    response: {
+      200: {
+        type: "string",
+        format: "binary",
+        description: "Berkas ZIP arsip data PDF2AI.",
+      },
+      401: errorResponse,
+    },
+  },
+  "POST /v1/backup/data/import": {
+    tags: ["Backup"],
+    summary: "Import / Restore arsip data dokumen",
+    description: "Mengunggah arsip ZIP untuk memulihkan atau menambahkan riwayat dokumen, Markdown, AI results, dan folder.",
+    operationId: "importData",
+    security: apiSecurity,
+    consumes: ["multipart/form-data", "application/zip"],
+    body: {
+      type: "object",
+      properties: {
+        file: {
+          type: "string",
+          format: "binary",
+          description: "File arsip ZIP data backup PDF2AI.",
+        },
+      },
+    },
+    response: {
+      200: {
+        type: "object",
+        required: ["ok", "message", "importedJobs", "importedAiResults", "importedFolders"],
+        properties: {
+          ok: { type: "boolean" },
+          message: { type: "string" },
+          importedJobs: { type: "integer" },
+          importedAiResults: { type: "integer" },
+          importedFolders: { type: "integer" },
+        },
+      },
+      400: errorResponse,
+      401: errorResponse,
+    },
+  },
 };
 
 function methodName(method) {
@@ -418,6 +517,7 @@ export function openApiOptions() {
         { name: "Jobs", description: "Upload dan hasil ekstraksi PDF." },
         { name: "Folders", description: "Pengelompokan dokumen secara virtual." },
         { name: "AI", description: "Model dan hasil Tanya AI." },
+        { name: "Backup", description: "Export dan import data serta konfigurasi PDF2AI." },
       ],
       components: {
         securitySchemes: {

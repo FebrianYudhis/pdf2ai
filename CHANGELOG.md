@@ -4,6 +4,33 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) dan versi mengikuti
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-08-24
+
+### Added
+
+- Fitur **Export & Import Konfigurasi (JSON)**:
+  - Mengunduh cadangan seluruh pengaturan OCR, provider AI, model pilihan, prompt template tersimpan, dan struktur folder virtual.
+  - Mengimpor file konfigurasi JSON untuk memulihkan atau menyinkronkan pengaturan antar-lingkungan server secara instan.
+- Fitur **Export & Import Data Dokumen Lengkap (ZIP)**:
+  - Mengemas seluruh riwayat dokumen (`metadata.json`), hasil ekstraksi Markdown (`result.md`), hasil analisis Tanya AI (`ai-results/*.json`), dan dokumen PDF asli (`input.pdf`) ke dalam file arsip `.zip`.
+  - Pilihan toggle untuk menyertakan atau mengecualikan file PDF asli pada arsip export untuk ukuran berkas yang lebih ringkas.
+  - Pemulihan data otomatis dengan mekanisme penggabungan (*merge*) tanpa menghapus dokumen yang sudah ada.
+  - Proteksi keamanan terhadap berkas ZIP corrupt dan serangan *Zip-Slip / Path Traversal*.
+- Tab baru **Data & Backup** pada modal Konfigurasi dashboard dengan antarmuka yang bersih, tombol aksi unduh/unggah, dan dialog status konfirmasi.
+- Endpoint REST API baru untuk sistem cadangan:
+  - `GET /v1/backup/config/export` untuk mengekspor konfigurasi JSON.
+  - `POST /v1/backup/config/import` untuk mengimpor konfigurasi JSON.
+  - `GET /v1/backup/data/export` untuk mengekspor arsip data dokumen ZIP.
+  - `POST /v1/backup/data/import` untuk memulihkan arsip data dokumen ZIP (mendukung multipart form-data & binary stream).
+- Dokumentasi lengkap endpoint Backup pada **Simple API Guide** (`/docs`) dan **Scalar OpenAPI Interactive Docs** (`/docs/scalar`).
+- Method sinkronisasi `.reload()` dan `.importFolders()` pada `JobQueue`, `AiResultStore`, dan `FolderStore` agar pembaruan data dapat langsung aktif tanpa restart server.
+
+### Fixed
+
+- Memperbaiki urutan penumpukan (*stacking order*) modal dan dialog SweetAlert2 agar selalu tampil di lapisan paling depan (*top layer*):
+  - Mengimplementasikan *smart dynamic target resolver* pada `Swal.fire` yang secara otomatis mendeteksi dan menempel pada elemen `<dialog>` yang sedang terbuka paling atas.
+  - Menyesuaikan styling `.swal2-container` dengan `position: fixed`, `z-index: 2147483647`, dan cakupan layar penuh di dalam dialog modal agar alert konfirmasi tidak pernah lagi terhalang di belakang backdrop modal.
+
 ## [1.7.4] - 2026-08-20
 
 ### Fixed

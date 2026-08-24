@@ -131,5 +131,11 @@ export const elements = {
   aiResultList: document.querySelector("#ai-result-list"),
   askAiProgress: document.querySelector("#ask-ai-progress"),
   executeAskAi: document.querySelector("#execute-ask-ai"),
+  exportConfigBtn: document.querySelector("#export-config-btn"),
+  importConfigFile: document.querySelector("#import-config-file"),
+  backupIncludePdf: document.querySelector("#backup-include-pdf"),
+  exportDataBtn: document.querySelector("#export-data-btn"),
+  importDataFile: document.querySelector("#import-data-file"),
+  backupWarning: document.querySelector("#backup-warning"),
   toastRegion: document.querySelector("#toast-region"),
 };

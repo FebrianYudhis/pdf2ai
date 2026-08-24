@@ -555,6 +555,10 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4" /><path d="m11 12 9-9M15 5l4 4M17 7l-2 2" /></svg>
             <span><strong>API Key</strong><small>Akses eksternal</small></span>
           </button>
+          <button class="config-tab" id="config-tab-backup" type="button" role="tab" aria-selected="false" aria-controls="config-panel-backup" data-config-tab="backup" tabindex="-1">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+            <span><strong>Data &amp; Backup</strong><small>Export &amp; import data</small></span>
+          </button>
         </div>
 
         <div class="config-panels">
@@ -676,6 +680,67 @@
             <div class="api-key-dialog-actions">
               <button class="secondary-button danger-button" id="revoke-api-key" type="button">Cabut key</button>
               <button class="primary-button" id="generate-api-key" type="button">Buat API key</button>
+            </div>
+          </section>
+
+          <section class="config-panel" id="config-panel-backup" role="tabpanel" aria-labelledby="config-tab-backup" data-config-panel="backup" hidden>
+            <div class="config-panel-body backup-dialog-body">
+              <div class="config-section-heading">
+                <div><span class="step-label">BACKUP &amp; RESTORE</span><h3>Export &amp; Import Data</h3></div>
+              </div>
+              <p class="config-intro">Unduh cadangan pengaturan aplikasi atau seluruh data dokumen hasil konversi, atau pulihkan data dari berkas cadangan.</p>
+
+              <div class="backup-grid">
+                <section class="settings-card">
+                  <div class="settings-card-heading">
+                    <span class="settings-icon">01</span>
+                    <div>
+                      <h4>Konfigurasi &amp; Prompt (JSON)</h4>
+                      <p>Pengaturan OCR, konfigurasi provider AI, model pilihan, prompt template tersimpan, dan struktur folder.</p>
+                    </div>
+                  </div>
+                  <div class="backup-card-actions">
+                    <button class="secondary-button backup-action-btn" id="export-config-btn" type="button">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+                      <span>Export Konfigurasi (.json)</span>
+                    </button>
+                    <label class="primary-button backup-upload-label" for="import-config-file">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" /></svg>
+                      <span>Import Konfigurasi</span>
+                      <input id="import-config-file" type="file" accept=".json,application/json" hidden />
+                    </label>
+                  </div>
+                </section>
+
+                <section class="settings-card">
+                  <div class="settings-card-heading">
+                    <span class="settings-icon">02</span>
+                    <div>
+                      <h4>Data Dokumen Lengkap (ZIP)</h4>
+                      <p>Seluruh riwayat antrean dokumen, hasil ekstraksi Markdown (<code>result.md</code>), riwayat Tanya AI, dan dokumen PDF asli.</p>
+                    </div>
+                  </div>
+                  <label class="toggle-setting backup-toggle">
+                    <input id="backup-include-pdf" type="checkbox" checked />
+                    <span class="toggle-control" aria-hidden="true"></span>
+                    <span><strong>Sertakan file PDF asli</strong><small>Nonaktifkan jika hanya ingin mengunduh hasil Markdown dan AI dengan ukuran file lebih kecil.</small></span>
+                  </label>
+                  <div class="backup-card-actions">
+                    <button class="secondary-button backup-action-btn" id="export-data-btn" type="button">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" /></svg>
+                      <span>Export Data (.zip)</span>
+                    </button>
+                    <label class="primary-button backup-upload-label" for="import-data-file">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" /></svg>
+                      <span>Import / Restore Data (.zip)</span>
+                      <input id="import-data-file" type="file" accept=".zip,application/zip,application/x-zip-compressed" hidden />
+                    </label>
+                  </div>
+                  <p class="backup-info-note">ℹ️ Import data akan menggabungkan dokumen ke riwayat tanpa menghapus data yang sudah ada.</p>
+                </section>
+              </div>
+
+              <p class="api-key-warning" id="backup-warning" hidden></p>
             </div>
           </section>
         </div>

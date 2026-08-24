@@ -88,8 +88,28 @@ async function copyText(value, successMessage) {
 }
 
 function getSwalTarget() {
-  return document.querySelector("dialog[open]") || document.body;
+  const openDialogs = document.querySelectorAll("dialog[open]");
+  return openDialogs.length > 0
+    ? openDialogs[openDialogs.length - 1]
+    : document.body;
 }
+
+const originalSwalFire = Swal.fire.bind(Swal);
+Swal.fire = function (options = {}, ...rest) {
+  const target = getSwalTarget();
+  if (typeof options === "string") {
+    return originalSwalFire({
+      title: options,
+      text: rest[0],
+      icon: rest[1],
+      target,
+    });
+  }
+  return originalSwalFire({
+    target: options.target ?? target,
+    ...options,
+  });
+};
 
 function showAiRequestError(job, error) {
   const message = error instanceof Error ? error.message : String(error);
@@ -1003,8 +1023,12 @@ const {
   closeConfiguration,
   createTemplateEditor,
   deleteAiConfiguration,
+  exportCompleteData,
+  exportConfigurationData,
   generateApiKey,
   importAiModels,
+  importCompleteData,
+  importConfigurationData,
   openConfiguration,
   refreshAiConfig,
   refreshApplicationConfig,
@@ -1597,6 +1621,10 @@ elements.revokeApiKey.addEventListener("click", revokeApiKey);
 elements.copyApiKey.addEventListener("click", async () => {
   await copyText(elements.apiKeyValue.textContent, "API key disalin.");
 });
+elements.exportConfigBtn?.addEventListener("click", exportConfigurationData);
+elements.importConfigFile?.addEventListener("change", importConfigurationData);
+elements.exportDataBtn?.addEventListener("click", exportCompleteData);
+elements.importDataFile?.addEventListener("change", importCompleteData);
 elements.logoutButton.addEventListener("click", async () => {
   elements.logoutButton.disabled = true;
   try {

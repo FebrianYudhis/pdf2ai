@@ -524,7 +524,165 @@ export function createConfigurationController({
       showToast(error.message, "error");
     }
   }
-  
+
+  async function exportConfigurationData() {
+    try {
+      const response = await api("/v1/backup/config/export");
+      const blob = await response.blob();
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `pdf2ai-config-${dateStr}.json`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      showToast("Konfigurasi berhasil diexport.");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  }
+
+  async function importConfigurationData(event) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    const inputElement = event.target;
+
+    try {
+      const text = await file.text();
+      let parsed;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        throw new Error("File bukan JSON yang valid.");
+      }
+
+      const confirm = await Swal.fire({
+        title: "Terapkan konfigurasi?",
+        text: "Pengaturan aplikasi, AI provider, template, dan folder akan diperbarui.",
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonText: "Ya, terapkan",
+        cancelButtonText: "Batal",
+      });
+      if (!confirm.isConfirmed) {
+        inputElement.value = "";
+        return;
+      }
+
+      Swal.fire({
+        title: "Mengimpor konfigurasi…",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading(),
+      });
+
+      const response = await api("/v1/backup/config/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(parsed),
+      });
+      const result = await response.json();
+
+      await Promise.allSettled([
+        refreshApplicationConfig(),
+        refreshAiConfig(),
+        refreshJobs?.({ quiet: true }),
+      ]);
+
+      Swal.fire({
+        title: "Berhasil!",
+        text: result.message || "Konfigurasi berhasil diterapkan.",
+        icon: "success",
+      });
+    } catch (error) {
+      Swal.fire({
+        title: "Gagal mengimpor konfigurasi",
+        text: error.message,
+        icon: "error",
+      });
+    } finally {
+      inputElement.value = "";
+    }
+  }
+
+  async function exportCompleteData() {
+    try {
+      const includePdfs = elements.backupIncludePdf.checked ? "true" : "false";
+      const response = await api(`/v1/backup/data/export?includePdfs=${includePdfs}`);
+      const blob = await response.blob();
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `pdf2ai-data-${dateStr}.zip`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      showToast("Data arsip berhasil diunduh.");
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  }
+
+  async function importCompleteData(event) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    const inputElement = event.target;
+
+    try {
+      const confirm = await Swal.fire({
+        title: "Pulihkan / Import Data?",
+        text: `File "${file.name}" akan diekstrak dan digabungkan ke riwayat antrean dokumen dan AI.`,
+        icon: "question",
+        showCancelButton: true,
+        confirmButtonText: "Ya, pulihkan data",
+        cancelButtonText: "Batal",
+      });
+      if (!confirm.isConfirmed) {
+        inputElement.value = "";
+        return;
+      }
+
+      Swal.fire({
+        title: "Mengimpor data dokumen…",
+        text: "Mohon tunggu, proses ekstraksi arsip sedang berjalan.",
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading(),
+      });
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await api("/v1/backup/data/import", {
+        method: "POST",
+        body: formData,
+      });
+      const result = await response.json();
+
+      await refreshJobs?.();
+
+      Swal.fire({
+        title: "Data Berhasil Dipulihkan!",
+        html: `<p>${result.message || "Data berhasil diimpor."}</p>
+               <ul style="text-align: left; margin: 12px auto; display: inline-block;">
+                 <li><strong>${result.importedJobs ?? 0}</strong> Dokumen / Job</li>
+                 <li><strong>${result.importedAiResults ?? 0}</strong> Hasil Analisis AI</li>
+                 <li><strong>${result.importedFolders ?? 0}</strong> Folder Baru</li>
+               </ul>`,
+        icon: "success",
+      });
+    } catch (error) {
+      Swal.fire({
+        title: "Gagal mengimpor data",
+        text: error.message,
+        icon: "error",
+      });
+    } finally {
+      inputElement.value = "";
+    }
+  }
 
   return {
     get aiConfig() {
@@ -533,8 +691,12 @@ export function createConfigurationController({
     closeConfiguration,
     createTemplateEditor,
     deleteAiConfiguration,
+    exportCompleteData,
+    exportConfigurationData,
     generateApiKey,
     importAiModels,
+    importCompleteData,
+    importConfigurationData,
     openConfiguration,
     refreshAiConfig,
     refreshApplicationConfig,

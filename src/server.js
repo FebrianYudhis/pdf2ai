@@ -47,6 +47,13 @@ import {
   extractMarkdown,
 } from "./server-ocr.js";
 import { FolderError, FolderStore } from "./folder-store.js";
+import {
+  BackupError,
+  exportConfiguration,
+  importConfiguration,
+  exportDataArchive,
+  importDataArchive,
+} from "./backup.js";
 import { openApiOptions } from "./openapi.js";
 
 export { checkHybridHealth, extractMarkdown, loadConfig };
@@ -206,11 +213,23 @@ export async function buildServer({
   await app.register(multipart, {
     limits: {
       files: 1,
-      fields: 1,
-      parts: 2,
+      fields: 2,
+      parts: 3,
       fileSize: maxBytes,
     },
   });
+
+  app.addContentTypeParser(
+    [
+      "application/zip",
+      "application/x-zip-compressed",
+      "application/octet-stream",
+    ],
+    { parseAs: "buffer" },
+    (_req, body, done) => {
+      done(null, body);
+    },
+  );
 
   await app.register(fastifyStatic, {
     root: join(import.meta.dirname, "..", "public"),
@@ -1001,6 +1020,101 @@ export async function buildServer({
     },
   );
 
+  app.get("/v1/backup/config/export", async (_request, reply) => {
+    const data = exportConfiguration({
+      applicationSettings,
+      aiConfig: mfaConfig?.ai,
+      folders: folders.list(),
+    });
+    const dateStr = new Date().toISOString().slice(0, 10);
+    reply.header(
+      "Content-Disposition",
+      `attachment; filename="pdf2ai-config-${dateStr}.json"`,
+    );
+    reply.header("Content-Type", "application/json; charset=utf-8");
+    return data;
+  });
+
+  app.post("/v1/backup/config/import", async (request) => {
+    const body = request.body;
+    if (!body || typeof body !== "object") {
+      throw new HttpError(400, "Body konfigurasi harus berupa JSON valid.");
+    }
+    const result = await importConfiguration({
+      configData: body,
+      applicationConfigFile,
+      authFile,
+      mfaConfig,
+      folderStore: folders,
+    });
+    if (result.applicationSettings) {
+      applicationSettings = result.applicationSettings;
+    }
+    if (result.aiConfig && mfaConfig) {
+      mfaConfig = { ...mfaConfig, ai: result.aiConfig };
+    }
+    return {
+      ok: true,
+      message: "Konfigurasi berhasil diimpor.",
+      newFoldersCount: result.newFoldersCount,
+      applicationConfig: publicApplicationConfig(),
+      aiConfig: publicAiConfig(),
+    };
+  });
+
+  app.get("/v1/backup/data/export", async (request, reply) => {
+    const includePdfs = request.query?.includePdfs !== "false";
+    const zipBuffer = await exportDataArchive({
+      dataDirectory,
+      aiResultDirectory: aiResults.directory,
+      folderStore: folders,
+      includePdfs,
+    });
+    const dateStr = new Date().toISOString().slice(0, 10);
+    reply.header(
+      "Content-Disposition",
+      `attachment; filename="pdf2ai-data-${dateStr}.zip"`,
+    );
+    reply.header("Content-Type", "application/zip");
+    return reply.send(zipBuffer);
+  });
+
+  app.post("/v1/backup/data/import", async (request) => {
+    let zipBuffer = null;
+    if (request.isMultipart()) {
+      const part = await request.file();
+      if (!part) {
+        throw new HttpError(400, "File arsip ZIP tidak ditemukan.");
+      }
+      zipBuffer = await part.toBuffer();
+    } else if (Buffer.isBuffer(request.body)) {
+      zipBuffer = request.body;
+    } else {
+      throw new HttpError(400, "Request harus berupa multipart/form-data atau binary zip.");
+    }
+
+    try {
+      const result = await importDataArchive({
+        zipBuffer,
+        dataDirectory,
+        aiResultDirectory: aiResults.directory,
+        folderStore: folders,
+        jobQueue: jobs,
+        aiResultStore: aiResults,
+      });
+      return {
+        ok: true,
+        message: "Data berhasil diimpor.",
+        ...result,
+      };
+    } catch (err) {
+      if (err instanceof BackupError) {
+        throw new HttpError(err.statusCode, err.message);
+      }
+      throw err;
+    }
+  });
+
   app.setErrorHandler((error, request, reply) => {
     if (error.code === "FST_REQ_FILE_TOO_LARGE") {
       return reply.code(413).send({
@@ -1017,6 +1131,7 @@ export async function buildServer({
       error instanceof AiError ||
       error instanceof FolderError ||
       error instanceof JobError ||
+      error instanceof BackupError ||
       (error.statusCode && error.statusCode < 500)
     ) {
       return reply.code(error.statusCode).send({ error: error.message });

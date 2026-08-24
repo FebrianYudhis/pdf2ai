@@ -309,6 +309,29 @@ export class AiResultStore {
     }
   }
 
+  async reload() {
+    await mkdir(this.directory, { recursive: true });
+    const entries = await readdir(this.directory, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith(".json")) {
+        continue;
+      }
+      try {
+        const result = JSON.parse(
+          await readFile(join(this.directory, entry.name), "utf8"),
+        );
+        if (validResult(result)) {
+          this.results.set(result.id, result);
+        }
+      } catch (error) {
+        this.logger.warn?.(
+          { err: error, file: entry.name },
+          "Hasil AI tidak dapat dibaca saat reload",
+        );
+      }
+    }
+  }
+
   list(jobId = null) {
     return [...this.results.values()]
       .filter((result) => !jobId || result.jobId === jobId)

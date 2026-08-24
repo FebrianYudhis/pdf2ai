@@ -64,6 +64,26 @@ export class FolderStore {
     }
   }
 
+  async reload() {
+    this.folders.clear();
+    await this.init();
+  }
+
+  async importFolders(importedFolders = []) {
+    let changed = false;
+    for (const folder of importedFolders) {
+      if (validFolder(folder)) {
+        if (!this.folders.has(folder.id)) {
+          this.folders.set(folder.id, folder);
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      await this.#persist();
+    }
+  }
+
   list() {
     return [...this.folders.values()].sort((left, right) =>
       left.name.localeCompare(right.name, "id", { sensitivity: "base" }),

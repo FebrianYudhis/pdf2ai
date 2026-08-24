@@ -3294,6 +3294,17 @@ a:focus-visible,
   z-index: 2147483647 !important;
 }
 
+dialog .swal2-container {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  top: 0 !important;
+  left: 0 !important;
+  z-index: 2147483647 !important;
+  overflow-y: auto !important;
+}
+
 .toast-region,
 .toast-region:popover-open {
   position: fixed;
@@ -3692,3 +3703,70 @@ a:focus-visible,
     max-width: none;
   }
 }
+
+.backup-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 18px;
+}
+
+.backup-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.backup-card-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.backup-action-btn,
+.backup-upload-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.backup-upload-label {
+  position: relative;
+  text-align: center;
+}
+
+.backup-action-btn svg,
+.backup-upload-label svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.backup-toggle {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.backup-info-note {
+  margin: 12px 0 0;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+  .backup-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
