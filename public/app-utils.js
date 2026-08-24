@@ -59,6 +59,39 @@ export function formatDuration(job) {
   return `${minutes} m ${remainder} d`;
 }
 
+export function calculatePaginationPages(currentPage, totalPages, maxVisible = 7) {
+  if (!Number.isInteger(totalPages) || totalPages <= 0) {
+    return [];
+  }
+  if (totalPages <= maxVisible) {
+    return Array.from({ length: totalPages }, (_, i) => i + 1);
+  }
+  const current = Math.min(Math.max(1, currentPage), totalPages);
+  if (current <= 4) {
+    return [1, 2, 3, 4, 5, "...", totalPages];
+  }
+  if (current >= totalPages - 3) {
+    return [
+      1,
+      "...",
+      totalPages - 4,
+      totalPages - 3,
+      totalPages - 2,
+      totalPages - 1,
+      totalPages,
+    ];
+  }
+  return [
+    1,
+    "...",
+    current - 1,
+    current,
+    current + 1,
+    "...",
+    totalPages,
+  ];
+}
+
 export async function api(path, options = {}) {
   const response = await fetch(path, options);
   if (!response.ok) {
@@ -73,3 +106,4 @@ export async function api(path, options = {}) {
   }
   return response;
 }
+

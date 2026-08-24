@@ -265,12 +265,18 @@
           <nav class="pagination-nav" id="pagination-nav" aria-label="Navigasi halaman dokumen" hidden>
             <span class="pagination-info" id="pagination-info">Menampilkan 1–6 dari 0 dokumen</span>
             <div class="pagination-controls">
-              <button class="pagination-button" id="pagination-prev" type="button" aria-label="Halaman sebelumnya">
-                ← Sebelumnya
+              <button class="pagination-button pagination-prev" id="pagination-prev" type="button" aria-label="Halaman sebelumnya">
+                <svg viewBox="0 0 24 24" class="pagination-icon" aria-hidden="true">
+                  <path d="M15 18l-6-6 6-6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span class="pagination-button-text">Sebelumnya</span>
               </button>
-              <div class="pagination-pages" id="pagination-pages"></div>
-              <button class="pagination-button" id="pagination-next" type="button" aria-label="Halaman berikutnya">
-                Selanjutnya →
+              <div class="pagination-pages" id="pagination-pages" role="group" aria-label="Nomor halaman"></div>
+              <button class="pagination-button pagination-next" id="pagination-next" type="button" aria-label="Halaman berikutnya">
+                <span class="pagination-button-text">Selanjutnya</span>
+                <svg viewBox="0 0 24 24" class="pagination-icon" aria-hidden="true">
+                  <path d="M9 18l6-6-6-6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
               </button>
             </div>
           </nav>

@@ -4,6 +4,21 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) dan versi mengikuti
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.4] - 2026-08-24
+
+### Added
+
+- Fitur kalkulasi pemendekan nomor halaman cerdas ([`calculatePaginationPages`](public/app-utils.js)) dengan dukungan ellipsis (`…`) saat jumlah halaman melebihi batas tampilan (misal `1 … 4 [5] 6 … 20`), mencegah luapan horizontal (*overflow*) pada antarmuka.
+- Ikon SVG chevron pada tombol navigasi **Sebelumnya** dan **Selanjutnya** di [`public/index.html`](public/index.html).
+- Penekanan visual angka tebal (`.pagination-highlight`) pada teks info dokumen (*"Menampilkan **1–6** dari **24** dokumen"*).
+- Penyesuaian tata letak responsif khusus navigasi halaman untuk layar ponsel dan tablet (`<= 600px` dan `<= 420px`).
+- Rangkaian pengujian unit untuk fungsi `calculatePaginationPages` di [`test/app-utils.test.js`](test/app-utils.test.js).
+
+### Changed
+
+- Pembaruan desain dan tipografi pagination dashboard agar selaras dengan tema neo-brutalist aplikasi (kontras warna halaman aktif, border tegas, status *disabled* yang jelas, dan transisi *hover/active* yang halus).
+- Navigasi halaman mempertahankan posisi scroll layar pengguna secara stabil tanpa interupsi lompatan viewport.
+
 ## [1.9.3] - 2026-08-24
 
 ### Changed

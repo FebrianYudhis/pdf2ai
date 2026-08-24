@@ -1798,10 +1798,11 @@ a:focus-visible,
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px 22px;
+  padding: 16px 24px;
   border-top: 2px solid var(--edge);
   background: var(--surface);
-  flex-wrap: wrap;
+  border-radius: 0 0 calc(var(--radius-lg) - 2px) calc(var(--radius-lg) - 2px);
+  user-select: none;
 }
 
 .pagination-nav[hidden] {
@@ -1809,9 +1810,18 @@ a:focus-visible,
 }
 
 .pagination-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   color: var(--muted);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+}
+
+.pagination-highlight {
+  color: var(--foreground);
+  font-weight: 800;
 }
 
 .pagination-controls {
@@ -1822,11 +1832,12 @@ a:focus-visible,
 }
 
 .pagination-button {
-  min-height: 34px;
+  min-height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0 12px;
+  gap: 6px;
+  padding: 0 14px;
   border: 2px solid var(--edge);
   border-radius: var(--radius-sm);
   background: var(--surface);
@@ -1834,9 +1845,22 @@ a:focus-visible,
   box-shadow: 2px 2px 0 0 var(--edge);
   font-family: inherit;
   font-size: 11px;
-  font-weight: 750;
+  font-weight: 800;
+  letter-spacing: 0.02em;
   cursor: pointer;
-  transition: all 100ms ease;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.pagination-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  display: inline-block;
+  vertical-align: middle;
 }
 
 .pagination-button:hover:not(:disabled) {
@@ -1851,20 +1875,23 @@ a:focus-visible,
 }
 
 .pagination-button:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: not-allowed;
   box-shadow: none;
+  background: var(--surface-muted);
+  border-color: var(--border);
+  color: var(--muted);
 }
 
 .pagination-pages {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .pagination-page-button {
-  min-width: 34px;
-  height: 34px;
+  min-width: 36px;
+  height: 36px;
   display: inline-grid;
   place-items: center;
   padding: 0 6px;
@@ -1873,11 +1900,15 @@ a:focus-visible,
   background: var(--surface);
   color: var(--foreground);
   box-shadow: 2px 2px 0 0 var(--edge);
-  font-family: inherit;
-  font-size: 11px;
+  font-family: "Cabinet Grotesk", "Inter", system-ui, sans-serif;
+  font-size: 12px;
   font-weight: 800;
   cursor: pointer;
-  transition: all 100ms ease;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    background 120ms ease,
+    color 120ms ease;
 }
 
 .pagination-page-button:hover:not(.active) {
@@ -1886,11 +1917,28 @@ a:focus-visible,
   box-shadow: 3px 3px 0 0 var(--edge);
 }
 
+.pagination-page-button:active:not(.active) {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 0 var(--edge);
+}
+
 .pagination-page-button.active {
   background: var(--primary);
   color: #ffffff;
   border-color: var(--edge);
   box-shadow: 2px 2px 0 0 var(--edge);
+}
+
+.pagination-ellipsis {
+  min-width: 28px;
+  height: 36px;
+  display: inline-grid;
+  place-items: center;
+  color: var(--muted);
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  user-select: none;
 }
 
 .markdown-dialog,
@@ -3617,6 +3665,41 @@ dialog .swal2-container {
     text-align: left;
   }
 
+  .pagination-nav {
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 14px;
+  }
+
+  .pagination-info {
+    text-align: center;
+    font-size: 11.5px;
+  }
+
+  .pagination-controls {
+    width: 100%;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .pagination-button {
+    padding: 0 10px;
+    min-height: 34px;
+    font-size: 10.5px;
+  }
+
+  .pagination-page-button {
+    min-width: 32px;
+    height: 32px;
+    font-size: 11px;
+  }
+
+  .pagination-ellipsis {
+    min-width: 20px;
+    height: 32px;
+  }
+
   .markdown-dialog,
   .fetch-dialog,
   .api-key-dialog,
@@ -3803,4 +3886,16 @@ dialog .swal2-container {
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 420px) {
+  .pagination-button-text {
+    display: none;
+  }
+
+  .pagination-button {
+    padding: 0 8px;
+    min-width: 34px;
+  }
+}
+
 

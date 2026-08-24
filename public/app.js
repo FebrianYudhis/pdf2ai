@@ -2,6 +2,7 @@ import Swal from "/vendor/sweetalert2.esm.all.min.js";
 import { elements } from "/app-elements.js";
 import {
   api,
+  calculatePaginationPages,
   formatBytes,
   formatDuration,
   formatLastUpdated,
@@ -663,7 +664,7 @@ function renderPagination(totalItems) {
   const endItem = Math.min(currentJobsPage * ITEMS_PER_PAGE, totalItems);
 
   if (elements.paginationInfo) {
-    elements.paginationInfo.textContent = `Menampilkan ${startItem}–${endItem} dari ${totalItems} dokumen`;
+    elements.paginationInfo.innerHTML = `Menampilkan <strong class="pagination-highlight">${startItem}–${endItem}</strong> dari <strong class="pagination-highlight">${totalItems}</strong> dokumen`;
   }
   if (elements.paginationPrev) {
     elements.paginationPrev.disabled = currentJobsPage <= 1;
@@ -673,9 +674,18 @@ function renderPagination(totalItems) {
   }
 
   if (elements.paginationPages) {
+    const pages = calculatePaginationPages(currentJobsPage, totalPages);
     elements.paginationPages.replaceChildren(
-      ...Array.from({ length: totalPages }, (_, index) => {
-        const pageNumber = index + 1;
+      ...pages.map((item) => {
+        if (item === "...") {
+          const ellipsis = document.createElement("span");
+          ellipsis.className = "pagination-ellipsis";
+          ellipsis.textContent = "…";
+          ellipsis.setAttribute("aria-hidden", "true");
+          return ellipsis;
+        }
+
+        const pageNumber = item;
         const pageBtn = document.createElement("button");
         pageBtn.type = "button";
         pageBtn.className = `pagination-page-button${pageNumber === currentJobsPage ? " active" : ""}`;
