@@ -418,6 +418,7 @@ test("dashboard, sub-navbar docs, Scalar API reference, dan health tersedia", as
   assert.match(docs.body, /href="#cancel-job"/);
   assert.match(docs.body, /\/v1\/queue\/pause/);
   assert.match(docs.body, /\/v1\/jobs\/:id\/cancel/);
+  assert.match(docs.body, /\/v1\/ai\/templates/);
   assert.equal(docsSlash.statusCode, 200);
   assert.equal(scalarDocs.statusCode, 200);
   assert.match(scalarDocs.body, /href="\/docs\/scalar" aria-current="page"/);
@@ -432,10 +433,13 @@ test("dashboard, sub-navbar docs, Scalar API reference, dan health tersedia", as
   assert.equal(specification.info.version, "v1");
   assert.ok(specification.paths["/v1/jobs"]?.post);
   assert.ok(specification.paths["/v1/folders/{id}"]?.get);
+  assert.ok(specification.paths["/v1/ai/templates"]?.get);
   assert.ok(specification.paths["/v1/jobs/{jobId}/ai/{aiId}"]?.get);
   assert.ok(specification.paths["/v1/queue/pause"]?.post);
   assert.ok(specification.paths["/v1/queue/resume"]?.post);
   assert.ok(specification.paths["/v1/jobs/{id}/cancel"]?.post);
+  assert.ok(specification.components.schemas.AiTemplates);
+  assert.ok(specification.components.schemas.AiTemplate);
   assert.equal(specification.paths["/login"], undefined);
   assert.deepEqual(specification.paths["/v1/health"].get.security, []);
   assert.equal(
@@ -908,6 +912,12 @@ test("konfigurasi Tanya AI, eksekusi, API key, dan hasil persisten", async (t) =
   });
   assert.equal(modelsWithoutLogin.statusCode, 401);
 
+  const templatesWithoutLogin = await app.inject({
+    method: "GET",
+    url: "/v1/ai/templates",
+  });
+  assert.equal(templatesWithoutLogin.statusCode, 401);
+
   const initialModels = await app.inject({
     method: "GET",
     url: "/v1/ai/models",
@@ -916,8 +926,22 @@ test("konfigurasi Tanya AI, eksekusi, API key, dan hasil persisten", async (t) =
   assert.deepEqual(initialModels.json(), {
     configured: false,
     modelsUrl: "/v1/ai/models",
+    templatesUrl: "/v1/ai/templates",
     models: [],
     defaultModel: null,
+    templates: [],
+    updatedAt: null,
+  });
+
+  const initialTemplates = await app.inject({
+    method: "GET",
+    url: "/v1/ai/templates",
+    headers: { cookie },
+  });
+  assert.deepEqual(initialTemplates.json(), {
+    configured: false,
+    templatesUrl: "/v1/ai/templates",
+    templates: [],
     updatedAt: null,
   });
 
@@ -1005,8 +1029,34 @@ test("konfigurasi Tanya AI, eksekusi, API key, dan hasil persisten", async (t) =
   assert.deepEqual(availableModels.json(), {
     configured: true,
     modelsUrl: "/v1/ai/models",
+    templatesUrl: "/v1/ai/templates",
     models: ["model-cepat", "model-teliti"],
     defaultModel: "model-teliti",
+    templates: [
+      {
+        id: templateId,
+        name: "Ambil total",
+        prompt: "Berapa total invoice?",
+      },
+    ],
+    updatedAt: saved.json().updatedAt,
+  });
+
+  const availableTemplates = await app.inject({
+    method: "GET",
+    url: "/v1/ai/templates",
+    headers: { cookie },
+  });
+  assert.deepEqual(availableTemplates.json(), {
+    configured: true,
+    templatesUrl: "/v1/ai/templates",
+    templates: [
+      {
+        id: templateId,
+        name: "Ambil total",
+        prompt: "Berapa total invoice?",
+      },
+    ],
     updatedAt: saved.json().updatedAt,
   });
 
@@ -1030,6 +1080,14 @@ test("konfigurasi Tanya AI, eksekusi, API key, dan hasil persisten", async (t) =
   assert.equal(initialJobDetail.json().job.hasAiResults, false);
   assert.equal(initialJobDetail.json().job.aiResultsCount, 0);
 
+  const emptyAiPayload = await app.inject({
+    method: "POST",
+    url: `/v1/jobs/${jobId}/ai`,
+    headers: { cookie },
+    payload: {},
+  });
+  assert.equal(emptyAiPayload.statusCode, 400);
+
   const unknownModel = await app.inject({
     method: "POST",
     url: `/v1/jobs/${jobId}/ai`,
@@ -1037,6 +1095,32 @@ test("konfigurasi Tanya AI, eksekusi, API key, dan hasil persisten", async (t) =
     payload: { model: "model-asing", message: "Ringkas" },
   });
   assert.equal(unknownModel.statusCode, 400);
+
+  const unknownTemplate = await app.inject({
+    method: "POST",
+    url: `/v1/jobs/${jobId}/ai`,
+    headers: { cookie },
+    payload: { templateId: "00000000-0000-0000-0000-000000000000" },
+  });
+  assert.equal(unknownTemplate.statusCode, 400);
+
+  const templateOnlyExecution = await app.inject({
+    method: "POST",
+    url: `/v1/jobs/${jobId}/ai`,
+    headers: { cookie },
+    payload: { templateId },
+  });
+  assert.equal(templateOnlyExecution.statusCode, 201);
+  assert.equal(templateOnlyExecution.json().result.model, "model-teliti");
+  assert.equal(templateOnlyExecution.json().result.templateName, "Ambil total");
+  assert.equal(
+    templateOnlyExecution.json().result.prompt,
+    "Berapa total invoice?",
+  );
+  assert.equal(
+    templateOnlyExecution.json().result.aiTemplatesUrl,
+    "/v1/ai/templates",
+  );
 
   const execution = await app.inject({
     method: "POST",
@@ -1058,11 +1142,29 @@ test("konfigurasi Tanya AI, eksekusi, API key, dan hasil persisten", async (t) =
   assert.equal(result.content, "Total invoice adalah Rp100.000.");
   assert.equal(result.jobId, jobId);
   assert.equal(result.jobUrl, `/v1/jobs/${jobId}`);
+  assert.equal(result.templateName, "Ambil total");
   assert.equal(result.aiModelsUrl, "/v1/ai/models");
+  assert.equal(result.aiTemplatesUrl, "/v1/ai/templates");
   assert.equal(result.aiResultsUrl, aiResultsUrl);
   assert.equal(result.resultUrl, `${aiResultsUrl}/${result.id}`);
   assert.equal(completionRequests[0].markdown, "# Invoice\n\nTotal: Rp100.000");
   assert.equal(completionRequests[0].token, "token-provider-rahasia");
+
+  const combinedExecution = await app.inject({
+    method: "POST",
+    url: `/v1/jobs/${jobId}/ai`,
+    headers: { cookie },
+    payload: {
+      templateId,
+      message: "Sertakan rincian diskon jika ada.",
+    },
+  });
+  assert.equal(combinedExecution.statusCode, 201);
+  assert.equal(combinedExecution.json().result.templateName, "Ambil total");
+  assert.equal(
+    combinedExecution.json().result.prompt,
+    "Berapa total invoice?\n\nINSTRUKSI TAMBAHAN:\nSertakan rincian diskon jika ada.",
+  );
 
   const jobDetailAfterAi = await app.inject({
     method: "GET",
@@ -1071,7 +1173,7 @@ test("konfigurasi Tanya AI, eksekusi, API key, dan hasil persisten", async (t) =
   });
   assert.equal(jobDetailAfterAi.statusCode, 200);
   assert.equal(jobDetailAfterAi.json().job.hasAiResults, true);
-  assert.equal(jobDetailAfterAi.json().job.aiResultsCount, 1);
+  assert.equal(jobDetailAfterAi.json().job.aiResultsCount, 3);
 
   const otherUploadData = multipartPdf("file", "%PDF-1.7\nother", "other.pdf");
   const otherUpload = await app.inject({
@@ -1102,6 +1204,14 @@ test("konfigurasi Tanya AI, eksekusi, API key, dan hasil persisten", async (t) =
   assert.equal(externalModels.statusCode, 200);
   assert.deepEqual(externalModels.json(), availableModels.json());
 
+  const externalTemplates = await app.inject({
+    method: "GET",
+    url: "/v1/ai/templates",
+    headers: { "x-api-key": apiKey },
+  });
+  assert.equal(externalTemplates.statusCode, 200);
+  assert.deepEqual(externalTemplates.json(), availableTemplates.json());
+
   const externalList = await app.inject({
     method: "GET",
     url: `/v1/jobs/${jobId}/ai`,
@@ -1110,8 +1220,15 @@ test("konfigurasi Tanya AI, eksekusi, API key, dan hasil persisten", async (t) =
   assert.equal(externalList.statusCode, 200);
   assert.equal(externalList.json().jobUrl, `/v1/jobs/${jobId}`);
   assert.equal(externalList.json().aiResultsUrl, aiResultsUrl);
-  assert.equal(externalList.json().results[0].id, result.id);
-  assert.equal(externalList.json().results[0].resultUrl, result.resultUrl);
+  assert.equal(externalList.json().results.length, 3);
+  assert.equal(
+    externalList.json().results[0].id,
+    combinedExecution.json().result.id,
+  );
+  assert.equal(
+    externalList.json().results[0].resultUrl,
+    combinedExecution.json().result.resultUrl,
+  );
 
   const restarted = await buildServer(dependencies);
   const persisted = await restarted.inject({
@@ -1158,6 +1275,7 @@ test("job background dapat diunggah, dibaca sebagai Markdown, lalu dihapus", asy
   assert.equal(upload.json().job.jobUrl, `/v1/jobs/${jobId}`);
   assert.equal(upload.json().job.pdfUrl, `/v1/jobs/${jobId}/pdf`);
   assert.equal(upload.json().job.aiModelsUrl, "/v1/ai/models");
+  assert.equal(upload.json().job.aiTemplatesUrl, "/v1/ai/templates");
   assert.equal(upload.json().job.aiResultsUrl, `/v1/jobs/${jobId}/ai`);
 
   await app.jobs.waitForIdle();
@@ -1169,6 +1287,7 @@ test("job background dapat diunggah, dibaca sebagai Markdown, lalu dihapus", asy
   );
   assert.equal(list.json().jobs[0].aiResultsUrl, `/v1/jobs/${jobId}/ai`);
   assert.equal(list.json().jobs[0].aiModelsUrl, "/v1/ai/models");
+  assert.equal(list.json().jobs[0].aiTemplatesUrl, "/v1/ai/templates");
 
   const detail = await app.inject({
     method: "GET",

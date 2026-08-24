@@ -3195,6 +3195,26 @@ a:focus-visible,
   margin-top: 18px;
 }
 
+.field-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ask-ai-mode-hint {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  color: var(--primary);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
 .ask-ai-message-field textarea {
   min-height: 150px;
 }
@@ -3232,6 +3252,20 @@ a:focus-visible,
   font-family: "Cascadia Code", Consolas, monospace;
   font-size: 10px;
   font-weight: 700;
+}
+
+.ai-result-template-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 4px;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--primary);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }
 
 .ai-result-card-header small {

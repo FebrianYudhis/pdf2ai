@@ -62,6 +62,7 @@
         <nav>
           <a href="#health"><span class="nav-method get">GET</span> Health</a>
           <a href="#ai-models"><span class="nav-method get">GET</span> Model AI</a>
+          <a href="#ai-templates"><span class="nav-method get">GET</span> Template AI</a>
           <a href="#folders"><span class="nav-method get">GET</span> Isi folder</a>
           <a href="#queue-control"><span class="nav-method post">POST</span> Jeda &amp; Lanjut</a>
           <a href="#create-job"><span class="nav-method post">POST</span> Buat job</a>
@@ -273,8 +274,16 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
             <pre>{
   "configured": true,
   "modelsUrl": "/v1/ai/models",
+  "templatesUrl": "/v1/ai/templates",
   "models": ["model-cepat", "model-teliti"],
   "defaultModel": "model-teliti",
+  "templates": [
+    {
+      "id": "TEMPLATE_ID",
+      "name": "Ringkasan Eksekutif",
+      "prompt": "Buat ringkasan eksekutif dokumen ini dalam 3 poin utama."
+    }
+  ],
   "updatedAt": "2026-08-01T09:00:00.000Z"
 }</pre>
           </details>
@@ -283,6 +292,42 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
             dengan <code>configured: false</code>, daftar kosong, dan
             <code>defaultModel: null</code>.
           </p>
+        </section>
+
+        <section class="docs-section endpoint-section" id="ai-templates">
+          <div class="endpoint-title">
+            <span class="method-badge get">GET</span>
+            <code>/v1/ai/templates</code>
+            <span class="auth-badge">API KEY</span>
+          </div>
+          <p>
+            Mengambil daftar template pertanyaan prompt AI yang tersimpan di konfigurasi dashboard.
+          </p>
+
+          <div class="code-sample docs-code-sample">
+            <div class="code-sample-header">
+              <span>cURL</span>
+              <button class="code-copy-button" type="button" data-copy="#ai-templates-code">Salin</button>
+            </div>
+            <pre id="ai-templates-code" data-code tabindex="0">curl -H "X-API-Key: $PDF2AI_API_KEY" \
+  {{BASE_URL}}/v1/ai/templates</pre>
+          </div>
+
+          <details class="response-details" open>
+            <summary>Contoh response · 200 OK</summary>
+            <pre>{
+  "configured": true,
+  "templatesUrl": "/v1/ai/templates",
+  "templates": [
+    {
+      "id": "TEMPLATE_ID",
+      "name": "Ringkasan Eksekutif",
+      "prompt": "Buat ringkasan eksekutif dokumen ini dalam 3 poin utama."
+    }
+  ],
+  "updatedAt": "2026-08-01T09:00:00.000Z"
+}</pre>
+          </details>
         </section>
 
         <section class="docs-section endpoint-section" id="folders">
@@ -468,6 +513,7 @@ const { job } = await response.json();</pre>
     "pdfUrl": "/v1/jobs/2a6cf34e-7c27-4ba8-afcc-8c91339e3f0c/pdf",
     "markdownUrl": null,
     "aiModelsUrl": "/v1/ai/models",
+    "aiTemplatesUrl": "/v1/ai/templates",
     "aiResultsUrl": "/v1/jobs/2a6cf34e-7c27-4ba8-afcc-8c91339e3f0c/ai"
   }
 }</pre>
@@ -554,6 +600,7 @@ const { job } = await response.json();</pre>
     "pdfUrl": "/v1/jobs/JOB_ID/pdf",
     "markdownUrl": "/v1/jobs/JOB_ID/markdown",
     "aiModelsUrl": "/v1/ai/models",
+    "aiTemplatesUrl": "/v1/ai/templates",
     "aiResultsUrl": "/v1/jobs/JOB_ID/ai"
   }
 }</pre>
@@ -656,24 +703,23 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
             <table class="parameter-table">
               <thead><tr><th>Field</th><th>Tipe</th><th>Wajib</th><th>Keterangan</th></tr></thead>
               <tbody>
-                <tr><td><code>model</code></td><td>string</td><td>Ya</td><td>Model yang sudah diimpor.</td></tr>
-                <tr><td><code>message</code></td><td>string</td><td>Ya</td><td>Instruksi atau pertanyaan untuk AI.</td></tr>
-                <tr><td><code>templateId</code></td><td>string | null</td><td>Tidak</td><td>ID template yang dipakai dari dashboard.</td></tr>
+                <tr><td><code>model</code></td><td>string</td><td>Tidak</td><td>Model yang digunakan. Jika tidak dikirim, otomatis memakai <code>defaultModel</code>.</td></tr>
+                <tr><td><code>message</code></td><td>string</td><td>Kondisional</td><td>Instruksi/pertanyaan manual. Wajib jika <code>templateId</code> tidak dikirim. Jika dikirim bersamaan dengan <code>templateId</code>, teks ini digabungkan sebagai instruksi tambahan.</td></tr>
+                <tr><td><code>templateId</code></td><td>string | null</td><td>Kondisional</td><td>ID template pertanyaan. Jika <code>message</code> tidak dikirim, prompt diambil langsung dari template ini.</td></tr>
               </tbody>
             </table>
           </div>
 
           <div class="code-sample docs-code-sample">
             <div class="code-sample-header">
-              <span>cURL</span>
+              <span>cURL · Menggunakan template</span>
               <button class="code-copy-button" type="button" data-copy="#ask-ai-code">Salin</button>
             </div>
             <pre id="ask-ai-code" data-code tabindex="0">curl -X POST {{BASE_URL}}/v1/jobs/JOB_ID/ai \
   -H "X-API-Key: $PDF2AI_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "MODEL_ID",
-    "message": "Ringkas dokumen dan tuliskan poin tindakan."
+    "templateId": "TEMPLATE_ID"
   }'</pre>
           </div>
 
@@ -684,11 +730,14 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
     "id": "HASIL_AI_ID",
     "jobId": "JOB_ID",
     "model": "MODEL_ID",
-    "prompt": "Ringkas dokumen dan tuliskan poin tindakan.",
+    "templateId": "TEMPLATE_ID",
+    "templateName": "Ringkasan Eksekutif",
+    "prompt": "Buat ringkasan eksekutif dokumen ini dalam 3 poin utama.",
     "content": "Jawaban dari AI...",
     "createdAt": "2026-08-01T09:00:00.000Z",
     "jobUrl": "/v1/jobs/JOB_ID",
     "aiModelsUrl": "/v1/ai/models",
+    "aiTemplatesUrl": "/v1/ai/templates",
     "aiResultsUrl": "/v1/jobs/JOB_ID/ai",
     "resultUrl": "/v1/jobs/JOB_ID/ai/HASIL_AI_ID"
   }
@@ -733,6 +782,7 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
       "content": "Jawaban dari AI...",
       "jobUrl": "/v1/jobs/JOB_ID",
       "aiModelsUrl": "/v1/ai/models",
+      "aiTemplatesUrl": "/v1/ai/templates",
       "aiResultsUrl": "/v1/jobs/JOB_ID/ai",
       "resultUrl": "/v1/jobs/JOB_ID/ai/HASIL_AI_ID"
     }
@@ -906,6 +956,7 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
                 <tr><td><code>pdfUrl</code></td><td>string</td><td>URL relatif PDF sumber.</td></tr>
                 <tr><td><code>markdownUrl</code></td><td>string | null</td><td>Tersedia setelah status <code>completed</code>.</td></tr>
                 <tr><td><code>aiModelsUrl</code></td><td>string</td><td>URL relatif daftar model AI yang dapat digunakan.</td></tr>
+                <tr><td><code>aiTemplatesUrl</code></td><td>string</td><td>URL relatif daftar template pertanyaan AI.</td></tr>
                 <tr><td><code>aiResultsUrl</code></td><td>string</td><td>URL relatif daftar dan pembuatan hasil AI milik job.</td></tr>
               </tbody>
             </table>
@@ -929,7 +980,8 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
                 <tr><td><code>jobId</code></td><td>UUID</td><td>Job PDF pemilik hasil.</td></tr>
                 <tr><td><code>originalName</code></td><td>string</td><td>Nama PDF sumber.</td></tr>
                 <tr><td><code>model</code></td><td>string</td><td>Model yang diminta client.</td></tr>
-                <tr><td><code>templateId</code></td><td>UUID | null</td><td>Template pertanyaan yang dipakai.</td></tr>
+                <tr><td><code>templateId</code></td><td>UUID | null</td><td>ID template pertanyaan yang dipakai.</td></tr>
+                <tr><td><code>templateName</code></td><td>string | null</td><td>Snapshot nama template yang dipakai.</td></tr>
                 <tr><td><code>prompt</code></td><td>string</td><td>Pertanyaan atau instruksi pengguna.</td></tr>
                 <tr><td><code>content</code></td><td>string</td><td>Jawaban provider AI.</td></tr>
                 <tr><td><code>providerId</code></td><td>string | null</td><td>ID response dari provider.</td></tr>
@@ -938,6 +990,7 @@ curl -H "X-API-Key: $PDF2AI_API_KEY" \
                 <tr><td><code>createdAt</code></td><td>ISO 8601</td><td>Waktu hasil disimpan.</td></tr>
                 <tr><td><code>jobUrl</code></td><td>string</td><td>URL relatif metadata job sumber.</td></tr>
                 <tr><td><code>aiModelsUrl</code></td><td>string</td><td>URL relatif daftar model AI.</td></tr>
+                <tr><td><code>aiTemplatesUrl</code></td><td>string</td><td>URL relatif daftar template pertanyaan AI.</td></tr>
                 <tr><td><code>aiResultsUrl</code></td><td>string</td><td>URL relatif koleksi hasil AI job.</td></tr>
                 <tr><td><code>resultUrl</code></td><td>string</td><td>URL relatif hasil AI ini.</td></tr>
               </tbody>

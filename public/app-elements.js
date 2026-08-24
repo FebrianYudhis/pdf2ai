@@ -126,6 +126,7 @@ export const elements = {
   askAiTemplate: document.querySelector("#ask-ai-template"),
   askAiModel: document.querySelector("#ask-ai-model"),
   askAiMessage: document.querySelector("#ask-ai-message"),
+  askAiModeHint: document.querySelector("#ask-ai-mode-hint"),
   askAiWarning: document.querySelector("#ask-ai-warning"),
   aiResultCount: document.querySelector("#ai-result-count"),
   aiResultList: document.querySelector("#ai-result-list"),

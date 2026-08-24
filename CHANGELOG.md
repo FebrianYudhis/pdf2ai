@@ -4,6 +4,32 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) dan versi mengikuti
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-08-24
+
+### Added
+
+- Endpoint REST API baru **`GET /v1/ai/templates`** untuk mengambil seluruh daftar prompt template AI tersimpan (beserta `id`, `name`, dan isi `prompt`).
+- Properti `templateName` (snapshot nama template saat dieksekusi) pada objek hasil AI (`AiResult`) dan file riwayat (`.ai-results/*.json`), menjaga kejelasan nama template meskipun template konfigurasi telah diubah atau dihapus.
+- Badge nama template (`.ai-result-template-badge`) pada setiap kartu riwayat jawaban Tanya AI di modal dialog dashboard.
+- Indikator feedback visual real-time (`.ask-ai-mode-hint`) pada modal Tanya AI saat pengguna mengedit teks template menjadi mode kustom.
+- Properti `templatesUrl: "/v1/ai/templates"` dan array `templates` pada response endpoint `GET /v1/ai/models`.
+- Properti tautan navigasi `aiTemplatesUrl: "/v1/ai/templates"` pada serialisasi objek `Job` (`/v1/jobs`, `/v1/jobs/:id`) dan objek hasil AI (`/v1/jobs/:jobId/ai`).
+- Fitur **Smart Prompt Appending (Penggabungan Otomatis)** pada backend `POST /v1/jobs/:jobId/ai`:
+  - Jika klien API mengirimkan `templateId` bersama dengan teks `message`, server otomatis menggabungkan prompt template dengan header `INSTRUKSI TAMBAHAN:` yang terstruktur bagi LLM.
+  - Pengecekan otomatis agar tidak menduplikasi teks jika `message` sudah memuat kalimat template.
+
+### Changed
+
+- Fleksibilitas eksekusi Tanya AI pada **`POST /v1/jobs/:jobId/ai`**:
+  - Parameter `model` kini bersifat opsional dan otomatis menggunakan `defaultModel` yang sedang aktif.
+  - Parameter `message` kini bersifat kondisional; klien dapat mengajukan pertanyaan cukup dengan mengirimkan `templateId` tanpa menulis ulang teks prompt.
+- Penyempurnaan UX pada Modal **Tanya AI** di Dashboard Web:
+  - Dropdown **"Sumber pertanyaan"** kini memantau input textarea pertanyaan secara real-time.
+  - Jika teks template diubah atau diedit oleh pengguna, dropdown otomatis berpindah ke **"Tulis manual"** (`custom mode`), menampilkan hint mode kustom, dan mengirimkan `templateId: null`, memastikan apa yang diproses ke AI adalah teks kustom yang terlihat di layar.
+- Pembaruan dokumentasi API secara menyeluruh pada **Simple API Guide** (`/docs`) dan **Scalar OpenAPI Interactive Docs** (`/docs/scalar`):
+  - Dokumentasi endpoint `GET /v1/ai/templates` lengkap dengan contoh cURL dan format response.
+  - Pembaruan skema OpenAPI `AiModels`, `AiTemplate`, `AiTemplates`, `AiPrompt`, `Job`, dan `AiResult`.
+
 ## [1.8.0] - 2026-08-24
 
 ### Added

@@ -40,6 +40,16 @@ const routeDocumentation = {
       401: errorResponse,
     },
   },
+  "GET /v1/ai/templates": {
+    tags: ["AI"],
+    summary: "Daftar template prompt AI",
+    operationId: "listAiTemplates",
+    security: apiSecurity,
+    response: {
+      200: { $ref: "#/components/schemas/AiTemplates" },
+      401: errorResponse,
+    },
+  },
   "GET /v1/folders": {
     tags: ["Folders"],
     summary: "Daftar folder virtual",
@@ -633,9 +643,32 @@ export function openApiOptions() {
               pdfUrl: { type: "string" },
               markdownUrl: { type: "string", nullable: true },
               aiModelsUrl: { type: "string" },
+              aiTemplatesUrl: { type: "string" },
               aiResultsUrl: { type: "string" },
               aiResultsCount: { type: "integer", minimum: 0 },
               hasAiResults: { type: "boolean" },
+            },
+          },
+          AiTemplate: {
+            type: "object",
+            required: ["id", "name", "prompt"],
+            properties: {
+              id: { type: "string" },
+              name: { type: "string" },
+              prompt: { type: "string" },
+            },
+          },
+          AiTemplates: {
+            type: "object",
+            required: ["configured", "templatesUrl", "templates"],
+            properties: {
+              configured: { type: "boolean" },
+              templatesUrl: { type: "string" },
+              templates: {
+                type: "array",
+                items: { $ref: "#/components/schemas/AiTemplate" },
+              },
+              updatedAt: { type: "string", format: "date-time", nullable: true },
             },
           },
           AiModels: {
@@ -644,19 +677,40 @@ export function openApiOptions() {
             properties: {
               configured: { type: "boolean" },
               modelsUrl: { type: "string" },
+              templatesUrl: { type: "string" },
               models: { type: "array", items: { type: "string" } },
               defaultModel: { type: "string", nullable: true },
+              templates: {
+                type: "array",
+                items: { $ref: "#/components/schemas/AiTemplate" },
+              },
               updatedAt: { type: "string", format: "date-time", nullable: true },
             },
           },
           AiPrompt: {
             type: "object",
-            required: ["model", "message"],
             additionalProperties: false,
             properties: {
-              model: { type: "string", minLength: 1, maxLength: 256 },
-              message: { type: "string", minLength: 1, maxLength: 20000 },
-              templateId: { type: "string", nullable: true, maxLength: 64 },
+              model: {
+                type: "string",
+                minLength: 1,
+                maxLength: 256,
+                description: "Model LLM. Jika tidak dikirim, menggunakan defaultModel.",
+              },
+              message: {
+                type: "string",
+                minLength: 1,
+                maxLength: 20000,
+                description:
+                  "Pertanyaan atau instruksi. Jika templateId juga dikirim, message akan digabungkan sebagai instruksi tambahan.",
+              },
+              templateId: {
+                type: "string",
+                nullable: true,
+                maxLength: 64,
+                description:
+                  "ID template prompt. Jika message tidak dikirim, prompt diambil langsung dari template ini.",
+              },
             },
           },
           AiResult: {
@@ -671,6 +725,7 @@ export function openApiOptions() {
               "createdAt",
               "jobUrl",
               "aiModelsUrl",
+              "aiTemplatesUrl",
               "aiResultsUrl",
               "resultUrl",
             ],
@@ -681,6 +736,11 @@ export function openApiOptions() {
               originalName: { type: "string" },
               model: { type: "string" },
               templateId: { type: "string", nullable: true },
+              templateName: {
+                type: "string",
+                nullable: true,
+                description: "Nama template prompt yang dipakai.",
+              },
               prompt: { type: "string" },
               content: { type: "string" },
               providerId: { type: "string", nullable: true },

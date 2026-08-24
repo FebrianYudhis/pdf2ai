@@ -375,7 +375,14 @@ export class AiResultStore {
     return publicResult(result);
   }
 
-  async save({ job, model, templateId = null, prompt, completion }) {
+  async save({
+    job,
+    model,
+    templateId = null,
+    templateName = null,
+    prompt,
+    completion,
+  }) {
     const result = {
       version: 1,
       id: randomUUID(),
@@ -383,6 +390,7 @@ export class AiResultStore {
       originalName: job.originalName,
       model,
       templateId,
+      templateName,
       prompt,
       content: completion.content,
       providerId: completion.providerId,

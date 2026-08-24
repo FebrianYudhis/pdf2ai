@@ -35,6 +35,7 @@ export function serializeJob(job, folders, aiResults = undefined) {
         ? `/v1/jobs/${job.id}/markdown`
         : null,
     aiModelsUrl: "/v1/ai/models",
+    aiTemplatesUrl: "/v1/ai/templates",
     aiResultsUrl: `/v1/jobs/${job.id}/ai`,
     aiResultsCount,
     hasAiResults: aiResultsCount > 0,
@@ -47,6 +48,7 @@ export function serializeAiResult(result) {
     ...result,
     jobUrl: `/v1/jobs/${result.jobId}`,
     aiModelsUrl: "/v1/ai/models",
+    aiTemplatesUrl: "/v1/ai/templates",
     aiResultsUrl,
     resultUrl: `${aiResultsUrl}/${result.id}`,
   };

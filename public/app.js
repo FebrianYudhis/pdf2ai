@@ -1062,6 +1062,12 @@ function renderAiResults(results) {
       const time = document.createElement("small");
       time.textContent = formatTime(result.createdAt);
       meta.append(model, time);
+      if (result.templateName) {
+        const templateBadge = document.createElement("span");
+        templateBadge.className = "ai-result-template-badge";
+        templateBadge.textContent = result.templateName;
+        meta.append(templateBadge);
+      }
 
       const actions = document.createElement("div");
       actions.className = "ai-result-card-actions";
@@ -1130,6 +1136,7 @@ async function openAskAi(job) {
   elements.askAiTitle.textContent = "Tanya AI";
   elements.askAiJobName.textContent = job.originalName;
   elements.askAiMessage.value = "";
+  elements.askAiModeHint.hidden = true;
   elements.askAiWarning.hidden = true;
   elements.aiResultCount.textContent = "Memuat…";
   const loadingResults = document.createElement("p");
@@ -1612,8 +1619,29 @@ elements.askAiTemplate.addEventListener("change", () => {
   const template = configuration.aiConfig.templates.find(
     (candidate) => candidate.id === elements.askAiTemplate.value,
   );
-  elements.askAiMessage.value = template?.prompt ?? "";
-  elements.askAiMessage.focus();
+  if (template) {
+    elements.askAiMessage.value = template.prompt;
+    elements.askAiMessage.focus();
+  }
+  elements.askAiModeHint.hidden = true;
+});
+elements.askAiMessage.addEventListener("input", () => {
+  if (elements.askAiTemplate.value) {
+    const selectedTemplate = configuration.aiConfig.templates.find(
+      (candidate) => candidate.id === elements.askAiTemplate.value,
+    );
+    if (
+      selectedTemplate &&
+      elements.askAiMessage.value !== selectedTemplate.prompt
+    ) {
+      elements.askAiTemplate.value = "";
+      elements.askAiModeHint.textContent =
+        "Mode kustom aktif (diedit dari template)";
+      elements.askAiModeHint.hidden = false;
+    }
+  } else if (!elements.askAiMessage.value.trim()) {
+    elements.askAiModeHint.hidden = true;
+  }
 });
 elements.executeAskAi.addEventListener("click", executeAskAi);
 elements.generateApiKey.addEventListener("click", generateApiKey);

@@ -717,10 +717,23 @@ export async function buildServer({
     return {
       configured: Boolean(ai?.baseUrl && models.length > 0),
       modelsUrl: "/v1/ai/models",
+      templatesUrl: "/v1/ai/templates",
       models,
       defaultModel: models.includes(ai?.defaultModel)
         ? ai.defaultModel
         : models[0] ?? null,
+      templates: ai?.templates ?? [],
+      updatedAt: ai?.updatedAt ?? null,
+    };
+  });
+
+  app.get("/v1/ai/templates", async () => {
+    const ai = mfaConfig?.ai;
+    const templates = ai?.templates ?? [];
+    return {
+      configured: Boolean(ai?.baseUrl && (ai.models?.length ?? 0) > 0),
+      templatesUrl: "/v1/ai/templates",
+      templates,
       updatedAt: ai?.updatedAt ?? null,
     };
   });
@@ -964,7 +977,6 @@ export async function buildServer({
       schema: {
         body: {
           type: "object",
-          required: ["model", "message"],
           additionalProperties: false,
           properties: {
             model: { type: "string", minLength: 1, maxLength: 256 },
@@ -978,22 +990,42 @@ export async function buildServer({
     },
     async (request, reply) => {
       const ai = mfaConfig?.ai;
-      if (!ai?.baseUrl || ai.models.length === 0) {
+      if (!ai?.baseUrl || !Array.isArray(ai.models) || ai.models.length === 0) {
         throw new HttpError(409, "Konfigurasi AI belum diselesaikan.");
       }
-      const model = request.body.model.trim();
+      const model =
+        request.body?.model?.trim() ||
+        (ai.models.includes(ai.defaultModel) ? ai.defaultModel : ai.models[0]);
       if (!ai.models.includes(model)) {
         throw new HttpError(400, "Model belum diimport dalam konfigurasi AI.");
       }
-      const prompt = request.body.message.trim();
-      if (!prompt) {
-        throw new HttpError(400, "Pesan untuk AI tidak boleh kosong.");
+
+      const templateId = request.body?.templateId?.trim() || null;
+      let matchedTemplate = null;
+      if (templateId) {
+        matchedTemplate = ai.templates?.find(
+          (template) => template.id === templateId,
+        );
+        if (!matchedTemplate) {
+          throw new HttpError(400, "Template AI tidak ditemukan.");
+        }
       }
-      if (
-        request.body.templateId &&
-        !ai.templates.some((template) => template.id === request.body.templateId)
-      ) {
-        throw new HttpError(400, "Template AI tidak ditemukan.");
+
+      let prompt = request.body?.message?.trim() || "";
+      if (matchedTemplate) {
+        if (!prompt) {
+          prompt = matchedTemplate.prompt;
+        } else if (
+          prompt !== matchedTemplate.prompt &&
+          !prompt.includes(matchedTemplate.prompt)
+        ) {
+          prompt = `${matchedTemplate.prompt}\n\nINSTRUKSI TAMBAHAN:\n${prompt}`;
+        }
+      } else if (!prompt) {
+        throw new HttpError(
+          400,
+          "Pesan atau templateId untuk AI harus disediakan.",
+        );
       }
 
       const job = jobs.get(request.params.jobId);
@@ -1010,7 +1042,8 @@ export async function buildServer({
       const result = await aiResults.save({
         job,
         model,
-        templateId: request.body.templateId ?? null,
+        templateId: matchedTemplate?.id ?? templateId ?? null,
+        templateName: matchedTemplate?.name ?? null,
         prompt,
         completion,
       });
