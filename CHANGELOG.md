@@ -4,19 +4,43 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) dan versi mengikuti
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-08-27
+
+### Added
+
+- Fitur **Seleksi Halaman Fleksibel (All & Custom)**:
+  - Pemilihan cakupan halaman individual per file PDF pada daftar antrean upload sebelum dikirim ke server.
+  - Mode `all` (default, mengekstrak 100% halaman dokumen) dan `custom` (mengekstrak rentang halaman tertentu seperti `1-5, 8, 11-14`).
+  - Input teks rentang halaman dinamis yang muncul otomatis saat mode kustom dipilih.
+- Fitur **Ubah Halaman di Tengah Jalan (Mid-Way Page Scope Update)**:
+  - Pengguna dapat mengubah cakupan halaman dokumen yang sedang menunggu di antrean (`queued`) langsung dari menu dropdown opsi (**⋮**) kartu dokumen.
+  - Modal dialog interaktif **Ubah Halaman Dokumen** untuk beralih mode dan memperbarui nomor halaman secara instan.
+- Dukungan opsi CLI `--pages` / `-p` pada script konversi mandiri (`npm run cli -- "file.pdf" -p "1-5, 8"`).
+- Endpoint REST API & Skema OpenAPI v3.1:
+  - `POST /v1/jobs` mendukung parameter multipart `pageMode` dan `pages`.
+  - `PATCH /v1/jobs/:id` mendukung perubahan `pageMode` dan `pages` saat status dokumen masih `queued` (mengembalikan status `409 Conflict` jika dokumen sudah diproses).
+  - Properti `pageMode`, `pages`, `extractedPages`, dan `totalPages` pada entitas respon `Job`.
+- Dokumentasi terintegrasi:
+  - Pembaruan panduan **Simple Docs** (`/docs`) dan **Scalar API Reference** (`/docs/scalar`) dengan endpoint `PATCH /v1/jobs/:id` dan tabel parameter `pageMode` & `pages`.
+
+### Changed
+
+- Tampilan badge metadata dokumen dipertahankan bersih dan elegan (hanya menampilkan tag `Hal: <rentang>` saat mode kustom digunakan).
+- Seluruh tindakan pengeditan halaman difokuskan secara konsisten ke menu dropdown aksi (**⋮**) kartu dokumen dengan ikon SVG pensil/edit khusus.
+
 ## [1.9.4] - 2026-08-24
 
 ### Added
 
-- Fitur kalkulasi pemendekan nomor halaman cerdas ([`calculatePaginationPages`](public/app-utils.js)) dengan dukungan ellipsis (`…`) saat jumlah halaman melebihi batas tampilan (misal `1 … 4 [5] 6 … 20`), mencegah luapan horizontal (*overflow*) pada antarmuka.
+- Fitur kalkulasi pemendekan nomor halaman cerdas ([`calculatePaginationPages`](public/app-utils.js)) dengan dukungan ellipsis (`…`) saat jumlah halaman melebihi batas tampilan (misal `1 … 4 [5] 6 … 20`), mencegah luapan horizontal (_overflow_) pada antarmuka.
 - Ikon SVG chevron pada tombol navigasi **Sebelumnya** dan **Selanjutnya** di [`public/index.html`](public/index.html).
-- Penekanan visual angka tebal (`.pagination-highlight`) pada teks info dokumen (*"Menampilkan **1–6** dari **24** dokumen"*).
+- Penekanan visual angka tebal (`.pagination-highlight`) pada teks info dokumen (_"Menampilkan **1–6** dari **24** dokumen"_).
 - Penyesuaian tata letak responsif khusus navigasi halaman untuk layar ponsel dan tablet (`<= 600px` dan `<= 420px`).
 - Rangkaian pengujian unit untuk fungsi `calculatePaginationPages` di [`test/app-utils.test.js`](test/app-utils.test.js).
 
 ### Changed
 
-- Pembaruan desain dan tipografi pagination dashboard agar selaras dengan tema neo-brutalist aplikasi (kontras warna halaman aktif, border tegas, status *disabled* yang jelas, dan transisi *hover/active* yang halus).
+- Pembaruan desain dan tipografi pagination dashboard agar selaras dengan tema neo-brutalist aplikasi (kontras warna halaman aktif, border tegas, status _disabled_ yang jelas, dan transisi _hover/active_ yang halus).
 - Navigasi halaman mempertahankan posisi scroll layar pengguna secara stabil tanpa interupsi lompatan viewport.
 
 ## [1.9.3] - 2026-08-24
@@ -24,9 +48,9 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 ### Changed
 
 - Restrukturisasi dan penyederhanaan dokumentasi utama ([`README.md`](README.md)):
-  - Mengubah format README menjadi lebih ringkas, elegan, dan ramah pengguna (*user-friendly*).
+  - Mengubah format README menjadi lebih ringkas, elegan, dan ramah pengguna (_user-friendly_).
   - Mengarahkan seluruh detail spesifikasi teknis dan referensi integrasi REST API langsung ke portal dokumentasi bawaan di dashboard: **Simple Docs** (`/docs`) dan **Scalar API Reference** (`/docs/scalar`).
-  - Menghilangkan ratusan baris payload cURL mentah dan potongan kode repetitif dari README agar lebih berfokus pada fitur utama, persyaratan sistem, panduan instalasi cepat (*quick start*), serta panduan penggunaan dashboard.
+  - Menghilangkan ratusan baris payload cURL mentah dan potongan kode repetitif dari README agar lebih berfokus pada fitur utama, persyaratan sistem, panduan instalasi cepat (_quick start_), serta panduan penggunaan dashboard.
 
 ## [1.9.2] - 2026-08-24
 
@@ -41,13 +65,13 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 ### Added
 
 - Indikator status loading visual saat proses **Export Konfigurasi (JSON)** dan **Export Data Lengkap (ZIP)**:
-  - Tombol aksi otomatis dinonaktifkan (*disabled*) dengan teks status `"Mengekspor…"` / `"Mengemas ZIP…"`.
+  - Tombol aksi otomatis dinonaktifkan (_disabled_) dengan teks status `"Mengekspor…"` / `"Mengemas ZIP…"`.
   - Dialog pemuatan interaktif SweetAlert saat mengemas arsip data dokumen ZIP yang berukuran besar.
-- Mekanisme pemuatan ulang otomatis (*auto-refresh*) `window.location.reload()` setelah proses **Import Konfigurasi** dan **Import Data Dokumen** berhasil, memastikan seluruh pengaturan sistem, model AI, template prompt, serta dokumen antrean langsung ter-load dan tersinkronisasi secara bersih di Dashboard.
+- Mekanisme pemuatan ulang otomatis (_auto-refresh_) `window.location.reload()` setelah proses **Import Konfigurasi** dan **Import Data Dokumen** berhasil, memastikan seluruh pengaturan sistem, model AI, template prompt, serta dokumen antrean langsung ter-load dan tersinkronisasi secara bersih di Dashboard.
 
 ### Changed
 
-- Pemisahan tanggung jawab cadangan (*backup separation*):
+- Pemisahan tanggung jawab cadangan (_backup separation_):
   - **Export & Import Konfigurasi (JSON)** kini murni mengelola pengaturan sistem, OCR, provider AI, dan template prompt tanpa menyertakan struktur folder virtual.
   - Struktur folder virtual (`folders.json`) sepenuhnya dikelola di dalam **Export & Import Data Dokumen Lengkap (ZIP)** bersama dengan data pekerjaan, Markdown, hasil AI, dan berkas PDF asli.
 
@@ -87,8 +111,8 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 - Fitur **Export & Import Data Dokumen Lengkap (ZIP)**:
   - Mengemas seluruh riwayat dokumen (`metadata.json`), hasil ekstraksi Markdown (`result.md`), hasil analisis Tanya AI (`ai-results/*.json`), dan dokumen PDF asli (`input.pdf`) ke dalam file arsip `.zip`.
   - Pilihan toggle untuk menyertakan atau mengecualikan file PDF asli pada arsip export untuk ukuran berkas yang lebih ringkas.
-  - Pemulihan data otomatis dengan mekanisme penggabungan (*merge*) tanpa menghapus dokumen yang sudah ada.
-  - Proteksi keamanan terhadap berkas ZIP corrupt dan serangan *Zip-Slip / Path Traversal*.
+  - Pemulihan data otomatis dengan mekanisme penggabungan (_merge_) tanpa menghapus dokumen yang sudah ada.
+  - Proteksi keamanan terhadap berkas ZIP corrupt dan serangan _Zip-Slip / Path Traversal_.
 - Tab baru **Data & Backup** pada modal Konfigurasi dashboard dengan antarmuka yang bersih, tombol aksi unduh/unggah, dan dialog status konfirmasi.
 - Endpoint REST API baru untuk sistem cadangan:
   - `GET /v1/backup/config/export` untuk mengekspor konfigurasi JSON.
@@ -100,8 +124,8 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 
 ### Fixed
 
-- Memperbaiki urutan penumpukan (*stacking order*) modal dan dialog SweetAlert2 agar selalu tampil di lapisan paling depan (*top layer*):
-  - Mengimplementasikan *smart dynamic target resolver* pada `Swal.fire` yang secara otomatis mendeteksi dan menempel pada elemen `<dialog>` yang sedang terbuka paling atas.
+- Memperbaiki urutan penumpukan (_stacking order_) modal dan dialog SweetAlert2 agar selalu tampil di lapisan paling depan (_top layer_):
+  - Mengimplementasikan _smart dynamic target resolver_ pada `Swal.fire` yang secara otomatis mendeteksi dan menempel pada elemen `<dialog>` yang sedang terbuka paling atas.
   - Menyesuaikan styling `.swal2-container` dengan `position: fixed`, `z-index: 2147483647`, dan cakupan layar penuh di dalam dialog modal agar alert konfirmasi tidak pernah lagi terhalang di belakang backdrop modal.
 
 ## [1.7.4] - 2026-08-20
@@ -109,7 +133,7 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 ### Fixed
 
 - Memperbaiki fungsi **Rotasi API key**, **Cabut key**, dan **Hapus konfigurasi AI** yang tidak merespons akibat `ReferenceError: confirmDeletion is not defined` pada `public/configuration-controller.js` dengan mengoper fungsi `confirmDeletion` dari `public/app.js`.
-- Memperbaiki posisi penumpukan dialog konfirmasi SweetAlert (`Swal.fire`) agar selalu tampil di lapisan terdepan (*top layer*) di atas modal aktif:
+- Memperbaiki posisi penumpukan dialog konfirmasi SweetAlert (`Swal.fire`) agar selalu tampil di lapisan terdepan (_top layer_) di atas modal aktif:
   - Menggantikan target statis `document.body` dengan penargetan dinamis `getSwalTarget()` (`document.querySelector("dialog[open]") || document.body`).
   - Menghindari bug layer pada modal browser native (`<dialog>.showModal()`), sehingga dialog konfirmasi pada menu konfigurasi API key, Tanya AI, dan manajemen dokumen tidak lagi terhalang di belakang backdrop modal.
 
@@ -117,14 +141,14 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 
 ### Added
 
-- Fitur **Pencarian Dokumen (Search Bar)** real-time pada dashboard dengan input pencarian, ikon pencarian, tombol pembersih cepat (*clear button*), serta *empty state* khusus saat dokumen tidak ditemukan.
+- Fitur **Pencarian Dokumen (Search Bar)** real-time pada dashboard dengan input pencarian, ikon pencarian, tombol pembersih cepat (_clear button_), serta _empty state_ khusus saat dokumen tidak ditemukan.
 - Fitur **Multi-Select Dokumen & Aksi Massal (Batch Actions)**:
-  - Checkbox interaktif pada setiap kartu dokumen beserta *highlight* visual saat dipilih (`.job-card.is-selected`).
-  - **Batch Action Bar** yang otomatis muncul saat satu atau lebih dokumen dipilih, menampilkan jumlah dokumen terpilih, kontrol *Select All* per halaman, tombol **Pindahkan Terpilih** ke folder virtual, dan tombol **Hapus Terpilih** dengan konfirmasi dialog.
+  - Checkbox interaktif pada setiap kartu dokumen beserta _highlight_ visual saat dipilih (`.job-card.is-selected`).
+  - **Batch Action Bar** yang otomatis muncul saat satu atau lebih dokumen dipilih, menampilkan jumlah dokumen terpilih, kontrol _Select All_ per halaman, tombol **Pindahkan Terpilih** ke folder virtual, dan tombol **Hapus Terpilih** dengan konfirmasi dialog.
 
 ### Fixed
 
-- Menyamakan proporsi dan gaya tombol aksi *deny* (`.swal2-deny`, contohnya tombol "Hapus folder" pada menu kelola) dengan tombol aksi lainnya pada dialog SweetAlert.
+- Menyamakan proporsi dan gaya tombol aksi _deny_ (`.swal2-deny`, contohnya tombol "Hapus folder" pada menu kelola) dengan tombol aksi lainnya pada dialog SweetAlert.
 
 ## [1.7.2] - 2026-08-20
 
@@ -137,7 +161,7 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 ### Changed
 
 - Menu aksi dokumen kini selalu menampilkan tombol **"Tanya AI"** untuk semua dokumen yang telah selesai diproses tanpa disembunyikan saat AI belum dikonfigurasi, dan memberikan petunjuk konfigurasi secara informatif saat dibuka.
-- Alert konfirmasi/pesan (SweetAlert) dan Toast notifikasi kini tetap berada di root `<body>` secara global dengan memanfaatkan `topLayer: true` dan atribut `popover="manual"` pada `#toast-region`, sehingga selalu tampil di lapisan terdepan (*top layer*) di atas modal dialog tanpa perlu disisipkan ke dalam elemen `<dialog>`.
+- Alert konfirmasi/pesan (SweetAlert) dan Toast notifikasi kini tetap berada di root `<body>` secara global dengan memanfaatkan `topLayer: true` dan atribut `popover="manual"` pada `#toast-region`, sehingga selalu tampil di lapisan terdepan (_top layer_) di atas modal dialog tanpa perlu disisipkan ke dalam elemen `<dialog>`.
 
 ### Fixed
 

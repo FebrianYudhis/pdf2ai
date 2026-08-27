@@ -66,9 +66,15 @@ export function shouldUseTextFallback(markdown, textLayer) {
   );
 }
 
-export async function extractTextLayer(path) {
+export async function extractTextLayer(path, options = {}) {
+  const pages = typeof options === "string" ? options : options?.pages;
+  const args = [scriptPath, path];
+  if (pages) {
+    args.push("-p", pages);
+  }
+
   return new Promise((resolvePromise, rejectPromise) => {
-    const child = spawn(pythonExecutable(), [scriptPath, path], {
+    const child = spawn(pythonExecutable(), args, {
       cwd: root,
       windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"],
@@ -99,3 +105,4 @@ export async function extractTextLayer(path) {
     });
   });
 }
+

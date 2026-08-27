@@ -48,8 +48,10 @@ export async function assertPdfSignature(path) {
   }
 }
 
-export async function extractMarkdown(path, config) {
+export async function extractMarkdown(path, config, options = {}) {
   ensureJava();
+
+  const pages = typeof options === "string" ? options : options?.pages || undefined;
 
   const convertOnce = (hybridMode) =>
     convert(path, {
@@ -57,6 +59,7 @@ export async function extractMarkdown(path, config) {
       toStdout: true,
       quiet: true,
       imageOutput: "off",
+      pages,
       hybrid: config.hybrid === "off" ? undefined : config.hybrid,
       hybridMode: config.hybrid === "off" ? undefined : hybridMode,
       hybridUrl: config.hybrid === "off" ? undefined : config.hybridUrl,
@@ -87,7 +90,7 @@ export async function extractMarkdown(path, config) {
   let textLayer = "";
 
   try {
-    textLayer = await extractTextLayer(path);
+    textLayer = await extractTextLayer(path, { pages });
     if (shouldUseTextFallback(markdown, textLayer)) {
       return plainTextToMarkdown(textLayer);
     }
@@ -114,3 +117,4 @@ export async function extractMarkdown(path, config) {
 
   return markdown;
 }
+

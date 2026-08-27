@@ -158,19 +158,38 @@ function multipartPdf(
   content = "%PDF-1.7\ntest",
   filename = "test.pdf",
   folderId = null,
+  pageMode = null,
+  pages = null,
 ) {
   const boundary = "----odl-pdf-test";
-  const folderPart = folderId
-    ? [
-        `--${boundary}`,
-        'Content-Disposition: form-data; name="folderId"',
-        "",
-        folderId,
-      ]
-    : [];
+  const extraParts = [];
+  if (folderId) {
+    extraParts.push(
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="folderId"',
+      "",
+      folderId,
+    );
+  }
+  if (pageMode) {
+    extraParts.push(
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="pageMode"',
+      "",
+      pageMode,
+    );
+  }
+  if (pages) {
+    extraParts.push(
+      `--${boundary}`,
+      'Content-Disposition: form-data; name="pages"',
+      "",
+      pages,
+    );
+  }
   const body = Buffer.from(
     [
-      ...folderPart,
+      ...extraParts,
       `--${boundary}`,
       `Content-Disposition: form-data; name="${fieldName}"; filename="${filename}"`,
       "Content-Type: application/pdf",
@@ -180,6 +199,7 @@ function multipartPdf(
       "",
     ].join("\r\n"),
   );
+
 
   return {
     payload: body,
@@ -1470,4 +1490,121 @@ test("endpoint /v1/queue/pause, /v1/queue/resume, dan /v1/jobs/:id/cancel bekerj
   assert.equal(check2.json().job.status, "failed");
   assert.equal(check2.json().job.error, "Dibatalkan oleh pengguna.");
 });
+
+test("POST /v1/jobs mendukung pemilihan mode halaman (all, custom)", async (t) => {
+  const config = testConfig();
+  const extractorCalls = [];
+  const app = await buildServer({
+    config,
+    extractor: async (_path, _cfg, options) => {
+      extractorCalls.push(options);
+      return `# Extracted pages: ${options?.pages || "all"}`;
+    },
+  });
+  t.after(() => app.close());
+
+  // 1. Upload dengan mode all (default)
+  const allUpload = await app.inject({
+    method: "POST",
+    url: "/v1/jobs",
+    ...multipartPdf("file", "%PDF-1.7\ncontent", "all.pdf", null, "all"),
+  });
+  assert.equal(allUpload.statusCode, 202);
+  const allJob = allUpload.json().job;
+  assert.equal(allJob.pageMode, "all");
+  assert.equal(allJob.pages, null);
+
+  // 2. Upload dengan mode custom
+  const customUpload = await app.inject({
+    method: "POST",
+    url: "/v1/jobs",
+    ...multipartPdf("file", "%PDF-1.7\ncontent", "custom.pdf", null, "custom", "1-3, 5"),
+  });
+  assert.equal(customUpload.statusCode, 202);
+  const customJob = customUpload.json().job;
+  assert.equal(customJob.pageMode, "custom");
+  assert.equal(customJob.pages, "1-3,5");
+  assert.equal(customJob.extractedPages, "1-3,5");
+
+  // 3. Upload custom tanpa pages harus ditolak (400)
+  const invalidCustom = await app.inject({
+    method: "POST",
+    url: "/v1/jobs",
+    ...multipartPdf("file", "%PDF-1.7\ncontent", "invalid.pdf", null, "custom"),
+  });
+  assert.equal(invalidCustom.statusCode, 400);
+  assert.match(invalidCustom.json().error, /Rentang halaman/);
+
+  await app.jobs.waitForIdle();
+
+  // Verifikasi extractor menerima parameter pages yang sesuai
+  assert.equal(extractorCalls.length, 2);
+  assert.equal(extractorCalls[0].pageMode, "all");
+  assert.equal(extractorCalls[0].pages, undefined);
+  assert.equal(extractorCalls[1].pageMode, "custom");
+  assert.equal(extractorCalls[1].pages, "1-3,5");
+});
+
+test("PATCH /v1/jobs/:id dapat mengubah cakupan halaman saat queued", async (t) => {
+  const config = testConfig();
+  const extractorCalls = [];
+  const app = await buildServer({
+    config,
+    extractor: async (_path, _cfg, options) => {
+      extractorCalls.push(options);
+      return "# Hasil";
+    },
+  });
+  t.after(() => app.close());
+
+  // Jeda antrean
+  await app.inject({ method: "POST", url: "/v1/queue/pause" });
+
+  // Upload job default (all)
+  const uploadRes = await app.inject({
+    method: "POST",
+    url: "/v1/jobs",
+    ...multipartPdf("file", "%PDF-1.7\ncontent", "patch-test.pdf", null, "all"),
+  });
+  assert.equal(uploadRes.statusCode, 202);
+  const jobId = uploadRes.json().job.id;
+  assert.equal(uploadRes.json().job.pageMode, "all");
+
+  // PATCH halaman saat masih queued
+  const patchRes = await app.inject({
+    method: "PATCH",
+    url: `/v1/jobs/${jobId}`,
+    payload: {
+      pageMode: "custom",
+      pages: "2-4, 7",
+    },
+  });
+  assert.equal(patchRes.statusCode, 200);
+  const patchedJob = patchRes.json().job;
+  assert.equal(patchedJob.pageMode, "custom");
+  assert.equal(patchedJob.pages, "2-4,7");
+  assert.equal(patchedJob.extractedPages, "2-4,7");
+
+  // Lanjutkan antrean
+  await app.inject({ method: "POST", url: "/v1/queue/resume" });
+  await app.jobs.waitForIdle();
+
+  // Verifikasi worker menerima parameter pages hasil pembaruan
+  assert.equal(extractorCalls.length, 1);
+  assert.equal(extractorCalls[0].pageMode, "custom");
+  assert.equal(extractorCalls[0].pages, "2-4,7");
+
+  // Coba PATCH setelah completed -> 409 Conflict
+  const rejectRes = await app.inject({
+    method: "PATCH",
+    url: `/v1/jobs/${jobId}`,
+    payload: { pageMode: "all" },
+  });
+  assert.equal(rejectRes.statusCode, 409);
+  assert.match(rejectRes.json().error, /menunggu di antrean/);
+});
+
+
+
+
 

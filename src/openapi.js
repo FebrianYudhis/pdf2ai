@@ -150,9 +150,23 @@ const routeDocumentation = {
           format: "uuid",
           description: "Folder tujuan opsional.",
         },
+        pageMode: {
+          type: "string",
+          enum: ["all", "custom"],
+          default: "all",
+          description:
+            "Mode ekstraksi halaman: all (semua halaman) atau custom (halaman tertentu).",
+        },
+        pages: {
+          type: "string",
+          description:
+            "Rentang halaman kustom (contoh: 1-5, 8, 11-14). Wajib diisi jika pageMode adalah custom.",
+        },
       },
     },
+
     response: {
+
       202: {
         type: "object",
         required: ["job"],
@@ -255,18 +269,29 @@ const routeDocumentation = {
   },
   "PATCH /v1/jobs/:id": {
     tags: ["Jobs"],
-    summary: "Pindahkan job ke folder",
-    operationId: "moveJob",
+    summary: "Perbarui folder atau cakupan halaman job",
+    description:
+      "Memindahkan job ke folder atau memperbarui rentang halaman yang diekstrak. Pembaruan cakupan halaman hanya dapat dilakukan saat job berstatus 'queued'.",
+    operationId: "patchJob",
     security: apiSecurity,
     params: uuidParams(),
     body: {
       type: "object",
-      required: ["folderId"],
+      minProperties: 1,
       additionalProperties: false,
       properties: {
         folderId: {
           anyOf: [{ type: "string", format: "uuid" }, { type: "null" }],
           description: "UUID folder atau null untuk melepas dari folder.",
+        },
+        pageMode: {
+          type: "string",
+          enum: ["all", "custom"],
+          description: "Mode ekstraksi halaman: all (semua) atau custom (halaman tertentu).",
+        },
+        pages: {
+          anyOf: [{ type: "string" }, { type: "null" }],
+          description: "Rentang halaman kustom (contoh: 1-5, 8, 11-14).",
         },
       },
     },
@@ -279,8 +304,10 @@ const routeDocumentation = {
       400: errorResponse,
       401: errorResponse,
       404: errorResponse,
+      409: errorResponse,
     },
   },
+
   "GET /v1/jobs/:id/pdf": {
     tags: ["Jobs"],
     summary: "Ambil PDF asli",
@@ -638,7 +665,17 @@ export function openApiOptions() {
                 nullable: true,
               },
               folderUrl: { type: "string", nullable: true },
+              pageMode: {
+                type: "string",
+                enum: ["all", "custom"],
+                default: "all",
+              },
+
+              pages: { type: "string", nullable: true },
+              extractedPages: { type: "string", nullable: true },
+              totalPages: { type: "integer", nullable: true, minimum: 1 },
               jobUrl: { type: "string" },
+
               pdfUrl: { type: "string" },
               markdownUrl: { type: "string", nullable: true },
               aiModelsUrl: { type: "string" },

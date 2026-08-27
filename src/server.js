@@ -213,11 +213,12 @@ export async function buildServer({
   await app.register(multipart, {
     limits: {
       files: 1,
-      fields: 2,
-      parts: 3,
+      fields: 10,
+      parts: 15,
       fileSize: maxBytes,
     },
   });
+
 
   app.addContentTypeParser(
     [
@@ -848,10 +849,30 @@ export async function buildServer({
       }
     }
 
+    const pageModeField = upload.fields?.pageMode;
+    const rawPageMode = pageModeField?.value
+      ? String(pageModeField.value).trim().toLowerCase()
+      : "all";
+    const pageMode = rawPageMode === "custom" ? "custom" : "all";
+
+    const pagesField = upload.fields?.pages;
+    const pages = pagesField?.value ? String(pagesField.value).trim() : null;
+
+
+    if (pageMode === "custom" && (!pages || !pages.trim())) {
+      upload.file.resume();
+      throw new HttpError(
+        400,
+        "Rentang halaman ('pages') harus diisi ketika memilih mode kustom.",
+      );
+    }
+
     return jobs.create({
       originalName: upload.filename,
       stream: upload.file,
       folderId,
+      pageMode,
+      pages,
       validate: async (path, stream) => {
         if (stream.truncated) {
           throw new HttpError(
@@ -863,6 +884,7 @@ export async function buildServer({
       },
     });
   }
+
 
   app.post("/v1/jobs", async (request, reply) => {
     const job = await receiveJob(request);
@@ -900,7 +922,7 @@ export async function buildServer({
       schema: {
         body: {
           type: "object",
-          required: ["folderId"],
+          minProperties: 1,
           additionalProperties: false,
           properties: {
             folderId: {
@@ -909,18 +931,37 @@ export async function buildServer({
                 { type: "null" },
               ],
             },
+            pageMode: {
+              type: "string",
+              enum: ["all", "custom"],
+            },
+            pages: {
+              anyOf: [{ type: "string" }, { type: "null" }],
+            },
           },
         },
       },
     },
     async (request) => {
-      if (request.body.folderId) {
-        folders.get(request.body.folderId);
+      let job = jobs.get(request.params.id);
+
+      if ("folderId" in request.body) {
+        if (request.body.folderId) {
+          folders.get(request.body.folderId);
+        }
+        job = await jobs.move(request.params.id, request.body.folderId);
       }
-      const job = await jobs.move(request.params.id, request.body.folderId);
+
+      if ("pageMode" in request.body || "pages" in request.body) {
+        const pageMode = request.body.pageMode ?? job.pageMode ?? "all";
+        const pages = "pages" in request.body ? request.body.pages : job.pages;
+        job = await jobs.updatePageScope(request.params.id, { pageMode, pages });
+      }
+
       return { job: serializeJob(job, folders, aiResults) };
     },
   );
+
 
   app.get("/v1/jobs/:id/pdf", async (request, reply) => {
     const job = jobs.get(request.params.id);

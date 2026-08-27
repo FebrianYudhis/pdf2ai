@@ -30,6 +30,8 @@ Opsi:
   -f, --format <format>        Format; koma atau ulangi opsi (default: json,markdown)
       --pages <range>          Contoh: 1,3,5-7
       --image-output <mode>    off, external, embedded (default: external)
+
+
       --image-format <format>  png atau jpeg (default: png)
       --table-method <method>  default atau cluster
       --reading-order <mode>   xycut atau off
@@ -293,6 +295,10 @@ export async function run(argv = process.argv.slice(2)) {
   const java = ensureJava();
   mkdirSync(outputDir, { recursive: true });
 
+  if (values.pages) {
+    console.log(`Halaman: ${values.pages}`);
+  }
+
   console.log(`Java   : ${java.path} (versi ${java.version})`);
   console.log(`Input  : ${inputPaths.length} path`);
   console.log(`Format : ${formats.join(", ")}`);
@@ -312,6 +318,8 @@ export async function run(argv = process.argv.slice(2)) {
     imageOutput: values["image-output"],
     imageFormat: values["image-format"],
     pages: values.pages,
+
+
     includeHeaderFooter: values["include-header-footer"],
     sanitize: values.sanitize,
     hybrid: hybrid === "off" ? undefined : hybrid,

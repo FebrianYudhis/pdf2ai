@@ -11,6 +11,7 @@ import {
 import { basename, join, resolve, sep } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { randomUUID } from "node:crypto";
+import { resolveJobPages } from "./pdf-page-utils.js";
 
 const TERMINAL_STATUSES = new Set(["completed", "failed"]);
 
@@ -32,6 +33,10 @@ function publicJob(job) {
     completedAt,
     error,
     folderId,
+    pageMode,
+    pages,
+    extractedPages,
+    totalPages,
   } = job;
 
   return {
@@ -43,9 +48,14 @@ function publicJob(job) {
     startedAt,
     completedAt,
     folderId: folderId ?? null,
+    pageMode: pageMode ?? "all",
+    pages: pages ?? null,
+    extractedPages: extractedPages ?? null,
+    totalPages: totalPages ?? null,
     ...(error ? { error } : {}),
   };
 }
+
 
 function validJobId(id) {
   return /^[0-9a-f-]{36}$/i.test(id);
@@ -144,7 +154,14 @@ export class JobQueue {
     }
   }
 
-  async create({ originalName, stream, validate, folderId = null }) {
+  async create({
+    originalName,
+    stream,
+    validate,
+    folderId = null,
+    pageMode = "all",
+    pages = null,
+  }) {
     const id = randomUUID();
     const directory = this.#jobDirectory(id);
     const inputPath = join(directory, "input.pdf");
@@ -154,6 +171,12 @@ export class JobQueue {
       await pipeline(stream, createWriteStream(inputPath, { flags: "wx" }));
       await validate?.(inputPath, stream);
       const fileStats = await stat(inputPath);
+      const pageResolution = await resolveJobPages({
+        pdfPath: inputPath,
+        pageMode,
+        pages,
+      });
+
       const job = {
         id,
         originalName: basename(originalName || "document.pdf"),
@@ -164,6 +187,10 @@ export class JobQueue {
         completedAt: null,
         error: null,
         folderId,
+        pageMode: pageResolution.pageMode,
+        pages: pageResolution.pages,
+        extractedPages: pageResolution.extractedPages,
+        totalPages: pageResolution.totalPages,
       };
 
       await this.#persist(job);
@@ -176,6 +203,7 @@ export class JobQueue {
       throw error;
     }
   }
+
 
   list() {
     return [...this.jobs.values()]
@@ -199,6 +227,45 @@ export class JobQueue {
     }
     return publicJob(job);
   }
+
+  async updatePageScope(id, { pageMode = "all", pages = null } = {}) {
+    const job = this.#require(id);
+    if (job.status !== "queued") {
+      throw new JobError(
+        409,
+        `Halaman hanya dapat diubah saat dokumen masih menunggu di antrean (status saat ini: '${job.status}').`,
+      );
+    }
+
+    const inputPath = join(this.#jobDirectory(id), "input.pdf");
+    const pageResolution = await resolveJobPages({
+      pdfPath: inputPath,
+      pageMode,
+      pages,
+    });
+
+    const previousScope = {
+      pageMode: job.pageMode,
+      pages: job.pages,
+      extractedPages: job.extractedPages,
+      totalPages: job.totalPages,
+    };
+
+    job.pageMode = pageResolution.pageMode;
+    job.pages = pageResolution.pages;
+    job.extractedPages = pageResolution.extractedPages;
+    job.totalPages = pageResolution.totalPages ?? job.totalPages;
+
+    try {
+      await this.#persist(job);
+    } catch (error) {
+      Object.assign(job, previousScope);
+      throw error;
+    }
+
+    return publicJob(job);
+  }
+
 
   async clearFolder(folderId) {
     const affected = [...this.jobs.values()].filter(
@@ -407,7 +474,13 @@ export class JobQueue {
           const markdown = await this.extractor(
             join(this.#jobDirectory(id), "input.pdf"),
             this.config,
+            {
+              pageMode: job.pageMode,
+              pages: job.extractedPages || job.pages || undefined,
+              job,
+            },
           );
+
 
           if (this.activeJob?.cancelled) {
             job.status = "failed";

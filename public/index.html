@@ -134,6 +134,8 @@
           </div>
 
           <label class="upload-folder-field" for="upload-folder">
+
+
             <span>
               <strong>Folder tujuan</strong>
               <small>Opsional · hanya untuk pengelompokan</small>
@@ -826,6 +828,80 @@
       </div>
     </dialog>
 
+    <dialog
+      class="edit-pages-dialog modal-dialog"
+      id="edit-pages-dialog"
+      aria-labelledby="edit-pages-title"
+    >
+      <div class="dialog-header">
+        <div>
+          <span class="step-label">PENGATURAN HALAMAN</span>
+          <h2 id="edit-pages-title">Ubah Halaman Dokumen</h2>
+          <small class="edit-pages-job-name" id="edit-pages-job-name"></small>
+        </div>
+        <button
+          class="icon-button"
+          id="close-edit-pages-dialog"
+          type="button"
+          aria-label="Tutup ubah halaman"
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
+
+      <form class="edit-pages-body" id="edit-pages-form" method="dialog">
+        <div class="edit-pages-options" role="radiogroup" aria-label="Mode ekstraksi halaman">
+          <label class="edit-pages-option" id="edit-pages-all-label">
+            <input
+              type="radio"
+              name="edit-page-mode"
+              id="edit-page-mode-all"
+              value="all"
+            />
+            <span class="scope-text">
+              <strong>Semua Halaman</strong>
+              <small>Ekstrak 100% halaman</small>
+            </span>
+          </label>
+          <label class="edit-pages-option" id="edit-pages-custom-label">
+            <input
+              type="radio"
+              name="edit-page-mode"
+              id="edit-page-mode-custom"
+              value="custom"
+            />
+            <span class="scope-text">
+              <strong>Halaman Kustom</strong>
+              <small>Tentukan rentang halaman</small>
+            </span>
+          </label>
+        </div>
+
+        <div class="edit-pages-custom-box" id="edit-pages-custom-box" hidden>
+          <label class="form-field" for="edit-pages-input">
+            <span>Rentang halaman:</span>
+            <input
+              type="text"
+              id="edit-pages-input"
+              placeholder="Contoh: 1-5, 8, 11-14"
+              autocomplete="off"
+            />
+            <small class="custom-pages-hint">Pisahkan nomor atau rentang dengan koma.</small>
+          </label>
+        </div>
+
+        <div class="dialog-actions">
+          <button class="secondary-button" id="cancel-edit-pages" type="button">
+            Batal
+          </button>
+          <button class="primary-button edit-pages-submit" id="save-edit-pages" type="submit">
+            Simpan Perubahan
+          </button>
+        </div>
+      </form>
+    </dialog>
+
     <div class="toast-region" id="toast-region" popover="manual" aria-live="polite"></div>
   </body>
 </html>
+

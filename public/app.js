@@ -27,10 +27,13 @@ const actionIconPaths = {
   api: "m8 8-4 4 4 4m8-8 4 4-4 4m-3-10-2 12",
   folder:
     "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Zm6 6h6m-3-3 3 3-3 3",
+  pages:
+    "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25ZM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83Z",
   cancel:
     "M18.3 5.71a1 1 0 0 0-1.42 0L12 10.59 7.12 5.71a1 1 0 0 0-1.42 1.42L10.59 12l-4.89 4.88a1 1 0 0 0 1.42 1.42L12 13.41l4.88 4.89a1 1 0 0 0 1.42-1.42L13.41 12l4.89-4.88a1 1 0 0 0 0-1.41Z",
   danger: "M4 7h16M9 7V4h6v3m-9 0 1 13h10l1-13m-8 4v5m4-5v5",
 };
+
 
 let selectedFiles = [];
 let currentMarkdown = "";
@@ -147,14 +150,87 @@ function renderSelection() {
   elements.uploadButton.disabled = selectedFiles.length === 0 || uploading;
   elements.selectionSummary.textContent = `${selectedFiles.length} file dipilih`;
   elements.selectionList.replaceChildren(
-    ...selectedFiles.map((file) => {
-      const item = document.createElement("li");
-      const name = document.createElement("span");
-      const size = document.createElement("span");
-      name.textContent = file.name;
-      size.textContent = formatBytes(file.size);
-      item.append(name, size);
-      return item;
+    ...selectedFiles.map((item) => {
+      const li = document.createElement("li");
+      li.className = "selection-item";
+
+      const header = document.createElement("div");
+      header.className = "selection-item-header";
+
+      const fileInfo = document.createElement("div");
+      fileInfo.className = "selection-file-info";
+      const name = document.createElement("strong");
+      name.className = "selection-file-name";
+      name.textContent = item.file.name;
+      name.title = item.file.name;
+      const size = document.createElement("small");
+      size.className = "selection-file-size";
+      size.textContent = formatBytes(item.file.size);
+      fileInfo.append(name, size);
+
+      const actions = document.createElement("div");
+      actions.className = "selection-item-actions";
+
+      // Scope toggle pills (Semua / Kustom)
+      const toggleGroup = document.createElement("div");
+      toggleGroup.className = "selection-scope-toggle";
+
+      const allBtn = document.createElement("button");
+      allBtn.type = "button";
+      allBtn.className = `selection-scope-btn${item.pageMode === "all" ? " is-active" : ""}`;
+      allBtn.textContent = "Semua";
+      allBtn.title = "Ekstrak semua halaman";
+      allBtn.addEventListener("click", () => {
+        item.pageMode = "all";
+        renderSelection();
+      });
+
+      const customBtn = document.createElement("button");
+      customBtn.type = "button";
+      customBtn.className = `selection-scope-btn${item.pageMode === "custom" ? " is-active" : ""}`;
+      customBtn.textContent = "Kustom";
+      customBtn.title = "Tentukan nomor/rentang halaman tertentu";
+      customBtn.addEventListener("click", () => {
+        item.pageMode = "custom";
+        renderSelection();
+      });
+
+      toggleGroup.append(allBtn, customBtn);
+
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "selection-remove-btn";
+      removeBtn.title = "Hapus file ini dari daftar";
+      removeBtn.setAttribute("aria-label", "Hapus file");
+      removeBtn.textContent = "✕";
+      removeBtn.addEventListener("click", () => {
+        selectedFiles = selectedFiles.filter((candidate) => candidate.id !== item.id);
+        renderSelection();
+      });
+
+      actions.append(toggleGroup, removeBtn);
+      header.append(fileInfo, actions);
+      li.append(header);
+
+      if (item.pageMode === "custom") {
+        const customBox = document.createElement("div");
+        customBox.className = "selection-custom-box";
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "selection-custom-input";
+        input.placeholder = "Rentang halaman (contoh: 1-5, 8, 11-14)";
+        input.value = item.pages;
+        input.addEventListener("input", (e) => {
+          item.pages = e.target.value;
+        });
+        const hint = document.createElement("small");
+        hint.className = "selection-custom-hint";
+        hint.textContent = "Pisahkan dengan koma (contoh: 1-5, 8)";
+        customBox.append(input, hint);
+        li.append(customBox);
+      }
+
+      return li;
     }),
   );
 }
@@ -173,18 +249,22 @@ function addFiles(files) {
     (file) =>
       file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"),
   );
-  const keys = new Set(
-    selectedFiles.map((file) => `${file.name}:${file.size}:${file.lastModified}`),
-  );
+  const keys = new Set(selectedFiles.map((item) => item.id));
   for (const file of pdfs) {
     const key = `${file.name}:${file.size}:${file.lastModified}`;
     if (!keys.has(key)) {
-      selectedFiles.push(file);
+      selectedFiles.push({
+        id: key,
+        file,
+        pageMode: "all",
+        pages: "",
+      });
       keys.add(key);
     }
   }
   renderSelection();
 }
+
 
 function actionIcon(name) {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -799,7 +879,17 @@ function renderJobs(jobs) {
       folderBadge.title = `Folder: ${job.folder.name}`;
       metaRow.append(folderBadge);
     }
+    if (job.pageMode === "custom" || job.pages) {
+      const pageBadge = document.createElement("span");
+      pageBadge.className = "file-page-badge is-custom";
+      pageBadge.textContent = `Hal: ${job.extractedPages || job.pages || "kustom"}`;
+      pageBadge.title = `Halaman Kustom: ${job.extractedPages || job.pages}${job.totalPages ? ` dari total ${job.totalPages} halaman` : ""}`;
+      metaRow.append(pageBadge);
+    }
+
     const isPendingAi = pendingAiRequests.has(job.id);
+
+
     const hasAi = Boolean(job.hasAiResults || (job.aiResultsCount ?? 0) > 0);
     if (isPendingAi || hasAi) {
       const aiBadge = document.createElement("button");
@@ -883,6 +973,18 @@ function renderJobs(jobs) {
         ),
       );
     }
+    if (job.status === "queued") {
+      actionButtons.push(
+        actionButton(
+          "Ubah halaman",
+          "job-menu-action edit-pages",
+          () => openEditPages(job),
+          "Ubah cakupan halaman yang akan diekstrak",
+          "pages",
+        ),
+      );
+    }
+
     actionButtons.push(
       actionButton(
         "Pindah",
@@ -892,6 +994,7 @@ function renderJobs(jobs) {
         "folder",
       ),
     );
+
     if (job.status === "queued" || job.status === "processing") {
       actionButtons.push(
         actionButton(
@@ -1261,27 +1364,39 @@ async function uploadSelected() {
     return;
   }
 
+  // Validasi jika ada file dengan mode custom yang belum diisi halamannya
+  for (const item of selectedFiles) {
+    if (item.pageMode === "custom" && !item.pages.trim()) {
+      showToast(`${item.file.name}: Tentukan rentang halaman kustom terlebih dahulu (contoh: 1-5, 8).`, "error");
+      return;
+    }
+  }
+
   uploading = true;
   elements.uploadButton.disabled = true;
-  const files = [...selectedFiles];
+  const items = [...selectedFiles];
   let completed = 0;
 
-  for (const file of files) {
+  for (const item of items) {
     elements.uploadButtonLabel.textContent =
-      `Mengunggah ${completed + 1} dari ${files.length}…`;
+      `Mengunggah ${completed + 1} dari ${items.length}…`;
     const form = new FormData();
     if (elements.uploadFolder.value) {
       form.append("folderId", elements.uploadFolder.value);
     }
-    form.append("file", file, file.name);
+    form.append("pageMode", item.pageMode || "all");
+    if (item.pageMode === "custom" && item.pages.trim()) {
+      form.append("pages", item.pages.trim());
+    }
+    form.append("file", item.file, item.file.name);
     try {
       await api("/v1/jobs", { method: "POST", body: form });
-      selectedFiles = selectedFiles.filter((candidate) => candidate !== file);
+      selectedFiles = selectedFiles.filter((candidate) => candidate.id !== item.id);
       completed += 1;
       renderSelection();
       await refreshJobs({ quiet: true });
     } catch (error) {
-      showToast(`${file.name}: ${error.message}`, "error");
+      showToast(`${item.file.name}: ${error.message}`, "error");
     }
   }
 
@@ -1293,7 +1408,91 @@ async function uploadSelected() {
   }
 }
 
+
+
+let currentEditPagesJob = null;
+
+function openEditPages(job) {
+  currentEditPagesJob = job;
+  if (elements.editPagesJobName) {
+    elements.editPagesJobName.textContent = `${job.originalName} (${formatBytes(job.size)})`;
+  }
+
+  const isCustom = job.pageMode === "custom" || Boolean(job.pages);
+  if (elements.editPagesModeAll) elements.editPagesModeAll.checked = !isCustom;
+  if (elements.editPagesModeCustom) elements.editPagesModeCustom.checked = isCustom;
+
+  if (elements.editPagesInput) {
+    elements.editPagesInput.value = job.pages || job.extractedPages || "";
+  }
+
+  syncEditPagesUi();
+
+  if (typeof elements.editPagesDialog?.showModal === "function") {
+    elements.editPagesDialog.showModal();
+  } else if (elements.editPagesDialog) {
+    elements.editPagesDialog.hidden = false;
+  }
+}
+
+function closeEditPages() {
+  currentEditPagesJob = null;
+  if (typeof elements.editPagesDialog?.close === "function") {
+    elements.editPagesDialog.close();
+  } else if (elements.editPagesDialog) {
+    elements.editPagesDialog.hidden = true;
+  }
+}
+
+function syncEditPagesUi() {
+  const isCustom = elements.editPagesModeCustom?.checked;
+  elements.editPagesOptions?.forEach((option) => {
+    const radio = option.querySelector("input[name='edit-page-mode']");
+    option.classList.toggle("active", Boolean(radio?.checked));
+  });
+  if (elements.editPagesCustomBox) {
+    elements.editPagesCustomBox.hidden = !isCustom;
+    if (isCustom) {
+      elements.editPagesInput?.focus();
+    }
+  }
+}
+
+async function handleSaveEditPages(event) {
+  event?.preventDefault();
+  if (!currentEditPagesJob) return;
+
+  const pageMode = elements.editPagesModeCustom?.checked ? "custom" : "all";
+  const pages = elements.editPagesInput ? elements.editPagesInput.value.trim() : "";
+
+  if (pageMode === "custom" && !pages) {
+    showToast("Tentukan rentang halaman kustom (contoh: 1-5, 8).", "error");
+    elements.editPagesInput?.focus();
+    return;
+  }
+
+  try {
+    if (elements.saveEditPages) elements.saveEditPages.disabled = true;
+    await api(`/v1/jobs/${currentEditPagesJob.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        pageMode,
+        pages: pageMode === "custom" ? pages : null,
+      }),
+    });
+    showToast("Cakupan halaman berhasil diperbarui.");
+    closeEditPages();
+    await refreshJobs({ quiet: true });
+  } catch (error) {
+    showToast(`Gagal mengubah halaman: ${error.message}`, "error");
+  } finally {
+    if (elements.saveEditPages) elements.saveEditPages.disabled = false;
+  }
+}
+
 async function openResult(job) {
+
   const pdfUrl = job.pdfUrl ?? `/v1/jobs/${job.id}/pdf`;
   const markdownUrl =
     job.markdownUrl ?? `/v1/jobs/${job.id}/markdown`;
@@ -1580,6 +1779,8 @@ elements.uploadFolder.addEventListener(
   "change",
   syncFolderFilterFromUploadDestination,
 );
+
+
 elements.refreshButton.addEventListener("click", () => refreshJobs());
 elements.createFolderButton.addEventListener("click", createVirtualFolder);
 elements.manageFolderButton.addEventListener("click", manageCurrentFolder);
@@ -1654,7 +1855,23 @@ elements.askAiMessage.addEventListener("input", () => {
   }
 });
 elements.executeAskAi.addEventListener("click", executeAskAi);
+elements.closeEditPagesDialog?.addEventListener("click", closeEditPages);
+elements.cancelEditPages?.addEventListener("click", closeEditPages);
+closeOnBackdropClick(elements.editPagesDialog, closeEditPages);
+elements.editPagesForm?.addEventListener("submit", handleSaveEditPages);
+elements.editPagesModeAll?.addEventListener("change", syncEditPagesUi);
+elements.editPagesModeCustom?.addEventListener("change", syncEditPagesUi);
+elements.editPagesOptions?.forEach((option) => {
+  option.addEventListener("click", () => {
+    const radio = option.querySelector("input[name='edit-page-mode']");
+    if (radio && !radio.checked) {
+      radio.checked = true;
+      syncEditPagesUi();
+    }
+  });
+});
 elements.generateApiKey.addEventListener("click", generateApiKey);
+
 elements.revokeApiKey.addEventListener("click", revokeApiKey);
 elements.copyApiKey.addEventListener("click", async () => {
   await copyText(elements.apiKeyValue.textContent, "API key disalin.");

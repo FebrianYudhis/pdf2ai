@@ -9,8 +9,10 @@ Semua proses ekstraksi PDF dan OCR berjalan secara **lokal** di komputer Anda. F
 ## ✨ Fitur Utama
 
 - 📄 **Ekstraksi PDF & OCR Lokal**: Didukung oleh OpenDataLoader PDF, Docling, dan RapidOCR (ONNX Runtime) tanpa bergantung pada cloud eksternal.
+- 🎯 **Seleksi Halaman Fleksibel**: Pilih untuk mengekstrak seluruh halaman PDF atau tentukan rentang halaman kustom per berkas (misal `1-5, 8`), serta kemampuan mengubah rentang halaman di antrean saat dokumen belum diproses.
 - ⚡ **Antrean Job Persisten**: Unggah banyak PDF sekaligus via drag-and-drop. Antrean dapat dijeda, dilanjutkan, dibatalkan, dan statusnya tetap aman saat server di-restart.
 - 📁 **Folder Virtual**: Kelompokkan dokumen dengan mudah tanpa memindahkan file fisik dari disk.
+
 - 💬 **Tanya AI & Template**: Ajukan pertanyaan langsung ke dokumen hasil ekstraksi menggunakan provider AI pilihan Anda.
 - 🔐 **Keamanan TOTP & API Key**: Login dashboard aman menggunakan kode 6-digit authenticator (tanpa password). Akses API eksternal dilindungi oleh rotasi API Key.
 - 📖 **Dokumentasi API Interaktif**: Dokumentasi terintegrasi langsung di dashboard dalam tampilan **Simple Docs** dan **Scalar API Reference**.
@@ -64,8 +66,11 @@ http://127.0.0.1:3000
    - Masukkan kode 6 digit untuk aktivasi. Login berikutnya hanya membutuhkan kode TOTP 6 digit.
 2. **Unggah & Antrean Dokumen**:
    - Tarik (*drag-and-drop*) satu atau beberapa berkas PDF ke area upload.
+   - Atur cakupan halaman (**Semua** atau **Kustom**, misal `1-5, 8`) per masing-masing file yang dipilih.
    - Pilih folder tujuan (opsional), lalu klik **Masukkan ke antrean**.
+   - *Tips:* Anda juga dapat mengubah rentang halaman kapan saja saat dokumen masih mengantre via menu opsi (**⋮**) → **Ubah halaman**.
 3. **Lihat Hasil & Tanya AI**:
+
    - Klik menu tiga titik (⋮) pada kartu dokumen yang sudah berstatus **Selesai**, lalu pilih **Lihat hasil**.
    - Anda dapat melihat PDF asli, metadata ekstraksi, serta menyalin/mengunduh format Markdown.
    - Buka menu **Tanya AI** untuk mulai berdiskusi dengan AI seputar isi dokumen tersebut.
@@ -116,8 +121,9 @@ npm start
 # Menjalankan Fastify server saja
 npm run server
 
-# Menjalankan CLI konversi PDF mandiri
-npm run cli -- "dokumen.pdf" -o output -f markdown
+# Menjalankan CLI konversi PDF mandiri (mendukung opsi rentang halaman: -p "1-5, 8")
+npm run cli -- "dokumen.pdf" -p "1-5, 8" -o output -f markdown
+
 
 # Menjalankan seluruh rangkaian automated test
 npm test

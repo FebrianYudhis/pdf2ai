@@ -22,6 +22,8 @@ export const elements = {
   uploadSizeLimit: document.querySelector("#upload-size-limit"),
   uploadFolder: document.querySelector("#upload-folder"),
   queueToggleButton: document.querySelector("#queue-toggle-button"),
+
+
   queueToggleLabel: document.querySelector("#queue-toggle-label"),
   queueIconPause: document.querySelector(".queue-icon-pause"),
   queueIconResume: document.querySelector(".queue-icon-resume"),
@@ -132,6 +134,17 @@ export const elements = {
   aiResultList: document.querySelector("#ai-result-list"),
   askAiProgress: document.querySelector("#ask-ai-progress"),
   executeAskAi: document.querySelector("#execute-ask-ai"),
+  editPagesDialog: document.querySelector("#edit-pages-dialog"),
+  closeEditPagesDialog: document.querySelector("#close-edit-pages-dialog"),
+  editPagesJobName: document.querySelector("#edit-pages-job-name"),
+  editPagesForm: document.querySelector("#edit-pages-form"),
+  editPagesModeAll: document.querySelector("#edit-page-mode-all"),
+  editPagesModeCustom: document.querySelector("#edit-page-mode-custom"),
+  editPagesOptions: document.querySelectorAll(".edit-pages-option"),
+  editPagesCustomBox: document.querySelector("#edit-pages-custom-box"),
+  editPagesInput: document.querySelector("#edit-pages-input"),
+  cancelEditPages: document.querySelector("#cancel-edit-pages"),
+  saveEditPages: document.querySelector("#save-edit-pages"),
   exportConfigBtn: document.querySelector("#export-config-btn"),
   importConfigFile: document.querySelector("#import-config-file"),
   backupIncludePdf: document.querySelector("#backup-include-pdf"),
@@ -140,3 +153,4 @@ export const elements = {
   backupWarning: document.querySelector("#backup-warning"),
   toastRegion: document.querySelector("#toast-region"),
 };
+

@@ -179,3 +179,43 @@ test("cancel job queued dan processing mengubah status menjadi failed", async ()
   assert.equal(queue.get(jobProcessing.id).error, "Dibatalkan oleh pengguna.");
 });
 
+test("updatePageScope: mengubah halaman saat queued dan menolak saat completed", async () => {
+  const { root, source } = await fixture();
+  const queue = new JobQueue({
+    dataDirectory: join(root, "jobs"),
+    config: {},
+    extractor: async () => "# Sukses",
+  });
+  await queue.init();
+  await queue.pause();
+
+  const job = await queue.create({
+    originalName: "dokumen.pdf",
+    stream: createReadStream(source),
+    pageMode: "all",
+  });
+  assert.equal(job.pageMode, "all");
+  assert.equal(job.pages, null);
+
+  // Ubah ke custom saat masih queued
+  const updated = await queue.updatePageScope(job.id, {
+    pageMode: "custom",
+    pages: "1-3, 5",
+  });
+  assert.equal(updated.pageMode, "custom");
+  assert.equal(updated.pages, "1-3,5");
+  assert.equal(updated.extractedPages, "1-3,5");
+
+  // Jalankan queue hingga selesai
+  await queue.resume();
+  await queue.waitForIdle();
+  assert.equal(queue.get(job.id).status, "completed");
+
+  // Coba ubah saat sudah completed -> harus gagal (409)
+  await assert.rejects(
+    () => queue.updatePageScope(job.id, { pageMode: "all" }),
+    (err) => err.statusCode === 409 && /menunggu di antrean/.test(err.message),
+  );
+});
+
+
