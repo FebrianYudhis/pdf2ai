@@ -86,6 +86,7 @@ export function createConfigurationController({
     elements.appMaxFileSize.value = settings.maxFileSizeMb;
     elements.appAiTimeout.value = settings.aiTimeoutSeconds;
     elements.appSessionHours.value = settings.sessionHours;
+    elements.appOcrIdleTimeout.value = settings.ocrIdleTimeoutSeconds ?? 180;
     syncForceOcrAvailability();
     syncOcrLanguageInformation();
     syncUploadSizeInformation(result);
@@ -140,6 +141,7 @@ export function createConfigurationController({
       maxFileSizeMb: Number(elements.appMaxFileSize.value),
       aiTimeoutSeconds: Number(elements.appAiTimeout.value),
       sessionHours: Number(elements.appSessionHours.value),
+      ocrIdleTimeoutSeconds: Number(elements.appOcrIdleTimeout.value ?? 180),
     };
   }
   
@@ -148,6 +150,7 @@ export function createConfigurationController({
       elements.appOcrLanguage,
       elements.appMaxFileSize,
       elements.appAiTimeout,
+      elements.appOcrIdleTimeout,
       elements.appSessionHours,
     ];
     const invalid = controls.find((control) => !control.reportValidity());

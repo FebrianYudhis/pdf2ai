@@ -17,6 +17,18 @@ function numberFromEnv(environment, name, fallback) {
   return parsed;
 }
 
+function nonNegativeNumberFromEnv(environment, name, fallback) {
+  const value = environment[name];
+  if (value === undefined) {
+    return fallback;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`${name} harus berupa angka positif atau 0.`);
+  }
+  return parsed;
+}
+
 function booleanFromEnv(environment, name, fallback) {
   const value = environment[name];
   if (value === undefined) {
@@ -40,7 +52,10 @@ export function buildOcrProcessEnvironment(
     ...environment,
     HF_HUB_DISABLE_SYMLINKS_WARNING: "1",
   };
-  if (!config.lowMemoryMode) {
+  if (config?.ocrIdleTimeoutSeconds !== undefined) {
+    childEnvironment.ODL_OCR_IDLE_TIMEOUT = String(config.ocrIdleTimeoutSeconds);
+  }
+  if (!config?.lowMemoryMode) {
     return childEnvironment;
   }
 
@@ -100,6 +115,7 @@ export function loadConfig({ environment = process.env, appConfigFile } = {}) {
     ["maxFileSizeMb", "ODL_MAX_FILE_SIZE_MB"],
     ["aiTimeoutSeconds", "APP_AI_TIMEOUT_MS"],
     ["sessionHours", "APP_SESSION_HOURS"],
+    ["ocrIdleTimeoutSeconds", "ODL_OCR_IDLE_TIMEOUT"],
   ]
     .filter(([, variable]) => environment[variable] !== undefined)
     .map(([field, variable]) => ({ field, variable }));
@@ -129,6 +145,11 @@ export function loadConfig({ environment = process.env, appConfigFile } = {}) {
       "APP_SESSION_HOURS",
       storedSettings.sessionHours,
     ),
+    ocrIdleTimeoutSeconds: nonNegativeNumberFromEnv(
+      environment,
+      "ODL_OCR_IDLE_TIMEOUT",
+      storedSettings.ocrIdleTimeoutSeconds,
+    ),
   });
   return {
     host: environment.HOST ?? "127.0.0.1",
@@ -142,6 +163,7 @@ export function loadConfig({ environment = process.env, appConfigFile } = {}) {
     ocrLanguage: effectiveSettings.ocrLanguage,
     hybridUrl: environment.ODL_HYBRID_URL ?? "http://127.0.0.1:5002",
     hybridTimeout: environment.ODL_HYBRID_TIMEOUT ?? "0",
+    ocrIdleTimeoutSeconds: effectiveSettings.ocrIdleTimeoutSeconds,
     authEnabled: true,
     sessionHours: effectiveSettings.sessionHours,
     aiTimeoutMs: effectiveSettings.aiTimeoutSeconds * 1000,

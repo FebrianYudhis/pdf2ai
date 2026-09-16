@@ -597,6 +597,10 @@ export function openApiOptions() {
               status: { type: "string", enum: ["ok", "not-ready"] },
               mode: { type: "string", enum: ["local", "hybrid"] },
               hybridReady: { type: "boolean" },
+              ocrState: {
+                type: "string",
+                enum: ["running", "sleeping", "waking", "stopped"],
+              },
               queue: { $ref: "#/components/schemas/QueueStats" },
             },
           },

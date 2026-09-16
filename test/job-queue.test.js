@@ -218,4 +218,42 @@ test("updatePageScope: mengubah halaman saat queued dan menolak saat completed",
   );
 });
 
+test("onActive, onIdle, dan ensureOcrReady dipanggil sesuai siklus antrean", async () => {
+  const { root, source } = await fixture();
+  let idleCount = 0;
+  let activeCount = 0;
+  let ensureOcrCount = 0;
+
+  const queue = new JobQueue({
+    dataDirectory: join(root, "jobs-idle"),
+    config: {},
+    onIdle: () => {
+      idleCount += 1;
+    },
+    onActive: () => {
+      activeCount += 1;
+    },
+    ensureOcrReady: async () => {
+      ensureOcrCount += 1;
+    },
+    extractor: async () => "# OCR Hasil",
+  });
+
+  await queue.init();
+  assert.equal(idleCount, 1);
+  assert.equal(activeCount, 0);
+
+  const job = await queue.create({
+    originalName: "dokumen.pdf",
+    stream: createReadStream(source),
+  });
+
+  assert.ok(activeCount >= 1);
+  await queue.waitForIdle();
+
+  assert.equal(queue.get(job.id).status, "completed");
+  assert.equal(ensureOcrCount, 1);
+  assert.ok(idleCount >= 2);
+});
+
 

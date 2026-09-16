@@ -67,6 +67,10 @@ export async function buildServer({
   dataDirectory =
     config.dataDirectory ??
     join(import.meta.dirname, "..", "data", "jobs"),
+  onQueueActive,
+  onQueueIdle,
+  ensureOcrReady,
+  getOcrState,
 } = {}) {
   const maxBytes = Math.floor(config.maxFileSizeMb * 1024 * 1024);
   const app = Fastify({
@@ -80,6 +84,9 @@ export async function buildServer({
     extractor,
     config,
     logger: app.log,
+    onActive: onQueueActive,
+    onIdle: onQueueIdle,
+    ensureOcrReady,
   });
   await jobs.init();
   app.decorate("jobs", jobs);
@@ -110,6 +117,7 @@ export async function buildServer({
       maxFileSizeMb: config.maxFileSizeMb ?? 25,
       aiTimeoutSeconds: (config.aiTimeoutMs ?? 300_000) / 1000,
       sessionHours: config.sessionHours ?? 12,
+      ocrIdleTimeoutSeconds: config.ocrIdleTimeoutSeconds ?? 180,
     },
   );
   let applicationSettings = normalizeApplicationSettings(
@@ -491,6 +499,7 @@ export async function buildServer({
             "maxFileSizeMb",
             "aiTimeoutSeconds",
             "sessionHours",
+            "ocrIdleTimeoutSeconds",
           ],
           additionalProperties: false,
           properties: {
@@ -505,6 +514,11 @@ export async function buildServer({
             maxFileSizeMb: { type: "integer", minimum: 1, maximum: 500 },
             aiTimeoutSeconds: { type: "integer", minimum: 1, maximum: 1800 },
             sessionHours: { type: "integer", minimum: 1, maximum: 168 },
+            ocrIdleTimeoutSeconds: {
+              type: "integer",
+              minimum: 0,
+              maximum: 86400,
+            },
           },
         },
       },
@@ -699,8 +713,10 @@ export async function buildServer({
   app.get("/guide", (_request, reply) => reply.redirect("/docs"));
 
   app.get("/v1/health", async (_request, reply) => {
+    const ocrState = getOcrState ? getOcrState() : undefined;
+    const isReadyState = ocrState === "sleeping" || ocrState === "waking";
     const hybridReady =
-      config.hybrid === "off"
+      config.hybrid === "off" || isReadyState
         ? true
         : await hybridHealth(config.hybridUrl);
 
@@ -708,6 +724,7 @@ export async function buildServer({
       status: hybridReady ? "ok" : "not-ready",
       mode: config.hybrid === "off" ? "local" : "hybrid",
       hybridReady,
+      ...(ocrState ? { ocrState } : {}),
       queue: jobs.stats(),
     });
   });
@@ -1227,9 +1244,9 @@ export async function buildServer({
   return app;
 }
 
-export async function startServer(config = loadConfig()) {
+export async function startServer(config = loadConfig(), options = {}) {
   ensureJava();
-  const app = await buildServer({ config });
+  const app = await buildServer({ config, ...options });
   await app.listen({ host: config.host, port: config.port });
   return app;
 }

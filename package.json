@@ -1,5 +1,6 @@
 {
   "name": "pdf2ai",
+  "version": "1.11.0",
   "private": true,
   "type": "module",
   "description": "PDF to AI-ready Markdown pipeline dengan OCR, antrean, dan API",

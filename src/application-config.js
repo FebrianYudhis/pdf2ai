@@ -12,6 +12,7 @@ export const DEFAULT_APPLICATION_SETTINGS = Object.freeze({
   maxFileSizeMb: 25,
   aiTimeoutSeconds: 300,
   sessionHours: 12,
+  ocrIdleTimeoutSeconds: 180,
 });
 
 const OCR_DEVICES = new Set(["cpu", "auto", "cuda", "mps", "xpu"]);
@@ -74,6 +75,13 @@ export function normalizeApplicationSettings(input = {}) {
       "Durasi sesi",
       1,
       168,
+      true,
+    ),
+    ocrIdleTimeoutSeconds: finiteNumber(
+      settings.ocrIdleTimeoutSeconds ?? 180,
+      "Timeout idle OCR",
+      0,
+      86400,
       true,
     ),
   };

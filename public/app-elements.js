@@ -94,6 +94,7 @@ export const elements = {
   appOcrLanguageHelp: document.querySelector("#app-ocr-language-help"),
   appMaxFileSize: document.querySelector("#app-max-file-size"),
   appAiTimeout: document.querySelector("#app-ai-timeout"),
+  appOcrIdleTimeout: document.querySelector("#app-ocr-idle-timeout"),
   appSessionHours: document.querySelector("#app-session-hours"),
   saveAppConfig: document.querySelector("#save-app-config"),
   apiKeyStatus: document.querySelector("#api-key-status"),

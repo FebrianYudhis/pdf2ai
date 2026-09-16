@@ -62,7 +62,15 @@ function validJobId(id) {
 }
 
 export class JobQueue {
-  constructor({ dataDirectory, extractor, config, logger = console }) {
+  constructor({
+    dataDirectory,
+    extractor,
+    config,
+    logger = console,
+    onActive,
+    onIdle,
+    ensureOcrReady,
+  }) {
     this.dataDirectory = resolve(dataDirectory);
     this.extractor = extractor;
     this.config = config;
@@ -73,6 +81,9 @@ export class JobQueue {
     this.paused = false;
     this.activeJob = null;
     this.idleWaiters = [];
+    this.onActive = onActive;
+    this.onIdle = onIdle;
+    this.ensureOcrReady = ensureOcrReady;
   }
 
   async init() {
@@ -126,7 +137,11 @@ export class JobQueue {
       .sort((left, right) => left.createdAt.localeCompare(right.createdAt))
       .forEach((job) => this.pending.push(job.id));
 
-    this.#schedule();
+    if (this.pending.length > 0) {
+      this.#schedule();
+    } else {
+      this.onIdle?.();
+    }
   }
 
   async reload() {
@@ -196,6 +211,7 @@ export class JobQueue {
       await this.#persist(job);
       this.jobs.set(id, job);
       this.pending.push(id);
+      this.onActive?.();
       this.#schedule();
       return publicJob(job);
     } catch (error) {
@@ -244,6 +260,13 @@ export class JobQueue {
       pages,
     });
 
+    if (job.status !== "queued") {
+      throw new JobError(
+        409,
+        `Halaman hanya dapat diubah saat dokumen masih menunggu di antrean (status saat ini: '${job.status}').`,
+      );
+    }
+
     const previousScope = {
       pageMode: job.pageMode,
       pages: job.pages,
@@ -281,13 +304,21 @@ export class JobQueue {
   async pause() {
     this.paused = true;
     await this.#persistQueueState();
+    if (!this.processing) {
+      this.onIdle?.();
+    }
     return this.stats();
   }
 
   async resume() {
     this.paused = false;
     await this.#persistQueueState();
-    this.#schedule();
+    if (this.pending.length > 0) {
+      this.onActive?.();
+      this.#schedule();
+    } else {
+      this.onIdle?.();
+    }
     return this.stats();
   }
 
@@ -306,6 +337,9 @@ export class JobQueue {
       job.completedAt = new Date().toISOString();
       job.error = "Dibatalkan oleh pengguna.";
       await this.#persist(job);
+      if (this.pending.length === 0 && !this.processing) {
+        this.onIdle?.();
+      }
       return publicJob(job);
     }
 
@@ -450,6 +484,7 @@ export class JobQueue {
       return;
     }
     this.processing = true;
+    this.onActive?.();
 
     try {
       while (this.pending.length > 0) {
@@ -471,6 +506,10 @@ export class JobQueue {
         await this.#persist(job);
 
         try {
+          if (typeof this.ensureOcrReady === "function") {
+            await this.ensureOcrReady();
+          }
+
           const markdown = await this.extractor(
             join(this.#jobDirectory(id), "input.pdf"),
             this.config,
@@ -519,6 +558,8 @@ export class JobQueue {
       waiters.forEach((resolvePromise) => resolvePromise());
       if (!this.paused && this.pending.length > 0) {
         this.#schedule();
+      } else {
+        this.onIdle?.();
       }
     }
   }

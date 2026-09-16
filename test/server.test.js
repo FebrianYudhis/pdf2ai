@@ -59,6 +59,65 @@ test("konfigurasi TOTP tidak memerlukan APP_PASSWORD", () => {
   }
 });
 
+test("konfigurasi idle timeout OCR default 180 detik dan dapat di-override", () => {
+  const previousTimeout = process.env.ODL_OCR_IDLE_TIMEOUT;
+  delete process.env.ODL_OCR_IDLE_TIMEOUT;
+
+  try {
+    assert.equal(loadConfig({ environment: {} }).ocrIdleTimeoutSeconds, 180);
+    assert.equal(
+      loadConfig({ environment: { ODL_OCR_IDLE_TIMEOUT: "300" } })
+        .ocrIdleTimeoutSeconds,
+      300,
+    );
+    assert.equal(
+      loadConfig({ environment: { ODL_OCR_IDLE_TIMEOUT: "0" } })
+        .ocrIdleTimeoutSeconds,
+      0,
+    );
+    assert.throws(
+      () => loadConfig({ environment: { ODL_OCR_IDLE_TIMEOUT: "-10" } }),
+      /angka positif atau 0/,
+    );
+  } finally {
+    if (previousTimeout === undefined) {
+      delete process.env.ODL_OCR_IDLE_TIMEOUT;
+    } else {
+      process.env.ODL_OCR_IDLE_TIMEOUT = previousTimeout;
+    }
+  }
+});
+
+test("endpoint /v1/health mengembalikan status siap saat OCR dalam mode sleeping atau waking", async (t) => {
+  const config = {
+    ...testConfig(),
+    hybrid: "docling-fast",
+    hybridUrl: "http://127.0.0.1:5002",
+  };
+  let currentState = "sleeping";
+  const app = await buildServer({
+    config,
+    getOcrState: () => currentState,
+    hybridHealth: async () => false,
+  });
+  t.after(() => app.close());
+
+  const responseSleep = await app.inject({ method: "GET", url: "/v1/health" });
+  assert.equal(responseSleep.statusCode, 200);
+  const bodySleep = responseSleep.json();
+  assert.equal(bodySleep.status, "ok");
+  assert.equal(bodySleep.hybridReady, true);
+  assert.equal(bodySleep.ocrState, "sleeping");
+
+  currentState = "waking";
+  const responseWake = await app.inject({ method: "GET", url: "/v1/health" });
+  assert.equal(responseWake.statusCode, 200);
+  const bodyWake = responseWake.json();
+  assert.equal(bodyWake.status, "ok");
+  assert.equal(bodyWake.hybridReady, true);
+  assert.equal(bodyWake.ocrState, "waking");
+});
+
 test("konfigurasi aplikasi persisten dimuat saat startup", async () => {
   const directory = mkdtempSync(join(tmpdir(), "pdf2ai-app-config-test-"));
   const appConfigFile = join(directory, "app-config.json");
@@ -71,6 +130,7 @@ test("konfigurasi aplikasi persisten dimuat saat startup", async () => {
     maxFileSizeMb: 64,
     aiTimeoutSeconds: 420,
     sessionHours: 36,
+    ocrIdleTimeoutSeconds: 300,
   });
 
   const config = loadConfig({ environment: {}, appConfigFile });
@@ -81,6 +141,7 @@ test("konfigurasi aplikasi persisten dimuat saat startup", async () => {
   assert.equal(config.maxFileSizeMb, 64);
   assert.equal(config.aiTimeoutMs, 420_000);
   assert.equal(config.sessionHours, 36);
+  assert.equal(config.ocrIdleTimeoutSeconds, 300);
 });
 
 test("konfigurasi aplikasi disimpan dan menandai perubahan yang perlu restart", async (t) => {
@@ -93,6 +154,7 @@ test("konfigurasi aplikasi disimpan dan menandai perubahan yang perlu restart", 
   assert.equal(initial.json().settings.ocrDevice, "cpu");
   assert.equal(initial.json().settings.ocrMode, "off");
   assert.equal(initial.json().settings.lowMemoryMode, false);
+  assert.equal(initial.json().settings.ocrIdleTimeoutSeconds, 180);
   assert.equal(initial.json().restartRequired, false);
 
   const settings = {
@@ -104,6 +166,7 @@ test("konfigurasi aplikasi disimpan dan menandai perubahan yang perlu restart", 
     maxFileSizeMb: 80,
     aiTimeoutSeconds: 600,
     sessionHours: 24,
+    ocrIdleTimeoutSeconds: 120,
   };
   const saved = await app.inject({
     method: "PUT",
@@ -116,6 +179,7 @@ test("konfigurasi aplikasi disimpan dan menandai perubahan yang perlu restart", 
   assert.ok(saved.json().restartFields.includes("ocrDevice"));
   assert.ok(saved.json().restartFields.includes("lowMemoryMode"));
   assert.ok(saved.json().restartFields.includes("maxFileSizeMb"));
+  assert.ok(saved.json().restartFields.includes("ocrIdleTimeoutSeconds"));
 
   const document = JSON.parse(
     readFileSync(join(config.dataDirectory, ".app-config.json"), "utf8"),

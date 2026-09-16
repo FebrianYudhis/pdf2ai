@@ -4,6 +4,42 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) dan versi mengikuti
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-09-16
+
+### Added
+
+- Fitur **Manajemen Memori OCR Cerdas (In-Process Model Lazy-Unload & Immediate Trimming)**:
+  - **In-Process Lazy Unload**: Backend hybrid server Python (`scripts/hybrid-server.py`) tetap aktif berjalan di port 5002 tanpa dimatikan saat idle, namun secara otomatis melepaskan bobot model Docling dari RAM saat antrean tidak memiliki aktivitas selama 3 menit (atau sesuai `ODL_OCR_IDLE_TIMEOUT`), memangkas pemakaian RAM dari **~3 GB kembali ke ~80–120 MB**.
+  - **Endpoint Manajemen Model HTTP**:
+    - `POST /v1/unload` dan `GET /v1/unload` pada hybrid server Python untuk melepaskan instance model dari RAM dan memicu pemangkasan memori secara langsung.
+  - **On-Demand Auto Reload via ASGI Middleware**:
+    - `LazyModelMiddleware` (pure ASGI) yang mencegat permintaan ke `/v1/convert/file` untuk memuat ulang model Docling secara transparan di thread terpisah (`asyncio.to_thread`) saat model sedang *unloaded*, tanpa pernah memicu error `503 Server not initialized`.
+  - **Immediate Memory Trimming Lintas Platform (Per-Dokumen)**:
+    - Post-execution hook pada konversi Docling yang langsung membebaskan buffer bitmap dan membersihkan memori segera setelah setiap dokumen selesai diproses:
+      - Python cyclic garbage collection: `gc.collect()`.
+      - VRAM GPU: `torch.cuda.empty_cache()` (NVIDIA) dan `torch.mps.empty_cache()` (Apple Silicon macOS).
+      - **Windows**: Windows API `EmptyWorkingSet` via `psapi.dll` dengan signature 64-bit `wintypes.HANDLE` yang valid.
+      - **Linux / Docker**: `malloc_trim(0)` via `libc.so.6` untuk mengembalikan arena heap glibc ke kernel OS.
+  - **Proteksi Concurrency & Anti-Interupsi**:
+    - Pelacak konversi aktif (`active_conversions` dan `_convert_lock`) yang menjamin model tidak akan pernah di-unload saat konversi sedang berjalan di tengah masa hitung mundur idle.
+    - Double-checked locking (`with model_lock`) untuk mencegah inisialisasi ganda saat banyak permintaan konversi masuk bersamaan.
+  - **Variabel Lingkungan Baru**:
+    - `ODL_OCR_IDLE_TIMEOUT`: Mengatur batas waktu idle antrean dalam detik sebelum model di-unload (default: `180` detik / 3 menit; set ke `0` untuk menonaktifkan unload otomatis).
+  - **Siklus Lifecycle & Self-Healing di Node.js**:
+    - `src/start.js` beralih dari mematikan proses ke pengiriman sinyal HTTP `POST /v1/unload`.
+    - `ensureOcrReady()` memverifikasi kelangsungan hidup server dalam waktu < 5 milidetik.
+    - Mekanisme *self-healing auto-restart* jika child process Python terhenti secara tidak terduga.
+  - **Indikator Status Standby di Dashboard**:
+    - Endpoint `/v1/health` mengembalikan status siap (`hybridReady: true`) dengan metadata `ocrState` (`"sleeping"` / `"waking"`).
+    - UI dashboard menampilkan status *"API & OCR siap (standby)"* saat model dilepas dari RAM, dan *"API & OCR siap (memuat model...)"* saat sedang dimuat ulang on-demand.
+  - **Pengaturan Langsung via UI Dashboard**:
+    - Input konfigurasi baru **"Timeout idle OCR"** pada modal Konfigurasi Dashboard (bagian *Waktu & Sesi*), tersimpan persisten di `data/app-config.json` dan didukung validasi skema REST API `PUT /auth/app-config` (0–86400 detik).
+
+### Changed
+
+- Pengelolaan proses backend OCR tidak lagi menggunakan penghentian proses paksa (`child.kill()`) saat idle, sehingga mengeliminasi risiko tabrakan port (`EADDRINUSE`) dan menghilangkan jeda *process cold-start*.
+- Rangkaian automated test diperluas untuk menguji siklus hidup antrean (`onActive`, `onIdle`, `ensureOcrReady`), respon health check saat standby, dan pembacaan konfigurasi `ocrIdleTimeoutSeconds`.
+
 ## [1.10.0] - 2026-08-27
 
 ### Added

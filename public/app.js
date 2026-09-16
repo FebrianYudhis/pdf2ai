@@ -1078,9 +1078,13 @@ async function checkHealth() {
     elements.serviceStatus.classList.toggle("ready", response.ok);
     elements.serviceStatus.classList.toggle("error", !response.ok);
     elements.serviceStatusText.textContent = response.ok
-      ? body.mode === "hybrid"
-        ? "API & OCR siap"
-        : "API siap"
+      ? body.ocrState === "sleeping"
+        ? "API & OCR siap (standby)"
+        : body.ocrState === "waking"
+          ? "API & OCR siap (memuat model...)"
+          : body.mode === "hybrid"
+            ? "API & OCR siap"
+            : "API siap"
       : "OCR belum siap";
   } catch {
     elements.serviceStatus.classList.remove("ready");
@@ -1119,6 +1123,7 @@ const applicationFieldLabels = {
   maxFileSizeMb: "batas ukuran PDF",
   aiTimeoutSeconds: "timeout AI",
   sessionHours: "durasi sesi",
+  ocrIdleTimeoutSeconds: "timeout idle OCR",
 };
 
 const configuration = createConfigurationController({

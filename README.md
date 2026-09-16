@@ -9,6 +9,7 @@ Semua proses ekstraksi PDF dan OCR berjalan secara **lokal** di komputer Anda. F
 ## ✨ Fitur Utama
 
 - 📄 **Ekstraksi PDF & OCR Lokal**: Didukung oleh OpenDataLoader PDF, Docling, dan RapidOCR (ONNX Runtime) tanpa bergantung pada cloud eksternal.
+- 🧠 **Manajemen Memori OCR Cerdas**: Pemangkasan buffer bitmap instan per-dokumen dan pelepasan bobot model otomatis saat idle 3 menit (*in-process lazy-unload*), memangkas konsumsi RAM dari ~3 GB ke ~80–120 MB tanpa mematikan proses server, dengan pemuatan ulang otomatis (*on-demand*) saat ada dokumen baru.
 - 🎯 **Seleksi Halaman Fleksibel**: Pilih untuk mengekstrak seluruh halaman PDF atau tentukan rentang halaman kustom per berkas (misal `1-5, 8`), serta kemampuan mengubah rentang halaman di antrean saat dokumen belum diproses.
 - ⚡ **Antrean Job Persisten**: Unggah banyak PDF sekaligus via drag-and-drop. Antrean dapat dijeda, dilanjutkan, dibatalkan, dan statusnya tetap aman saat server di-restart.
 - 📁 **Folder Virtual**: Kelompokkan dokumen dengan mudah tanpa memindahkan file fisik dari disk.
@@ -106,6 +107,7 @@ Aplikasi dapat dikonfigurasi melalui menu **Konfigurasi** di dashboard atau mela
 | `HOST` | `127.0.0.1` | Host binding server |
 | `ODL_OCR_LANG` | `english` | Bahasa model OCR (`english`, `chinese_cht`, dll.) |
 | `ODL_OCR_DEVICE` | `cpu` | Perangkat akselerasi OCR (`cpu`, `cuda`, `mps`, `xpu`) |
+| `ODL_OCR_IDLE_TIMEOUT` | `180` | Batas idle antrean (detik) sebelum bobot model OCR dilepas dari RAM (`0` untuk nonaktif) |
 | `ODL_LOW_MEMORY_MODE` | `false` | Batasi RAM & thread untuk komputer berspesifikasi rendah |
 | `ODL_MAX_FILE_SIZE_MB` | `25` | Batas maksimum ukuran file upload (MB) |
 | `APP_SESSION_HOURS` | `12` | Durasi sesi login dashboard (jam) |
@@ -148,6 +150,15 @@ PORT=3001 npm start
 Aktifkan **Mode hemat memori** di **Konfigurasi → Aplikasi**, atau jalankan dengan perintah:
 ```bash
 ODL_LOW_MEMORY_MODE=true npm start
+```
+</details>
+
+<details>
+<summary><b>Penggunaan RAM Tetap Tinggi setelah Pemrosesan Dokumen</b></summary>
+
+PDF2AI versi 1.11.0+ dilengkapi manajemen memori idle otomatis. Jika tidak ada dokumen baru dalam antrean selama 3 menit, bobot model Docling akan otomatis dilepas (*in-process lazy-unloaded*) dan memori RAM dipangkas kembali ke kisaran **~80–120 MB** tanpa mematikan proses server. Anda dapat mempercepat waktu pemangkasan RAM (misal menjadi 1 menit) melalui variabel lingkungan:
+```bash
+ODL_OCR_IDLE_TIMEOUT=60 npm start
 ```
 </details>
 

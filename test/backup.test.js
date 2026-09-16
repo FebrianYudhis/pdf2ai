@@ -49,6 +49,7 @@ test("exportConfiguration dan importConfiguration berfungsi dengan benar", async
     maxFileSizeMb: 25,
     aiTimeoutSeconds: 300,
     sessionHours: 12,
+    ocrIdleTimeoutSeconds: 180,
   };
 
   const aiConfig = {
