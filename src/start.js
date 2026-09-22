@@ -11,37 +11,20 @@ import {
   buildOcrProcessEnvironment,
   resolveOcrLanguage,
 } from "./server-config.js";
+import { createOcrSupervisor } from "./ocr-supervisor.js";
 
 const root = resolve(import.meta.dirname, "..");
 const config = loadConfig();
-let ocrProcess = null;
 let server = null;
 let stopping = false;
-let ocrRestartTimer = null;
 
-function sleep(milliseconds) {
-  return new Promise((resolvePromise) =>
-    setTimeout(resolvePromise, milliseconds),
-  );
-}
+const idleMinutes = Number(config.ocrIdleMinutes ?? 5);
+const idleMs =
+  config.hybrid !== "off" && Number.isFinite(idleMinutes) && idleMinutes > 0
+    ? idleMinutes * 60_000
+    : 0;
 
-async function waitForHybrid(timeoutMs = 180_000) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (await checkHybridHealth(config.hybridUrl, 2_000)) {
-      return;
-    }
-    if (ocrProcess?.exitCode !== null) {
-      throw new Error(
-        `Backend OCR berhenti dengan exit code ${ocrProcess.exitCode}.`,
-      );
-    }
-    await sleep(1_000);
-  }
-  throw new Error("Backend OCR belum ready setelah 180 detik.");
-}
-
-function startOcrProcess() {
+function resolvePython() {
   const python = join(
     root,
     ".venv",
@@ -53,7 +36,11 @@ function startOcrProcess() {
       "Backend OCR belum di-install. Jalankan: npm.cmd run setup:ocr",
     );
   }
+  return python;
+}
 
+function spawnOcrProcess() {
+  const python = resolvePython();
   const url = new URL(config.hybridUrl);
   const ocrEngine = process.env.ODL_OCR_ENGINE ?? "rapidocr";
   const ocrLanguage = resolveOcrLanguage(
@@ -89,41 +76,21 @@ function startOcrProcess() {
     stdio: "inherit",
     windowsHide: true,
   });
-  ocrProcess = child;
-
   child.on("error", (error) => {
     console.error(`Backend OCR gagal dijalankan: ${error.message}`);
   });
-  child.on("exit", (code, signal) => {
-    if (ocrProcess === child) {
-      ocrProcess = null;
-    }
-    if (stopping) {
-      return;
-    }
-
-    console.error(
-      `Backend OCR berhenti (code=${code ?? "null"}, signal=${signal ?? "none"}). ` +
-        "Mencoba menyalakan ulang...",
-    );
-    if (ocrRestartTimer) {
-      clearTimeout(ocrRestartTimer);
-    }
-    ocrRestartTimer = setTimeout(async () => {
-      ocrRestartTimer = null;
-      if (stopping || (await checkHybridHealth(config.hybridUrl))) {
-        return;
-      }
-      try {
-        startOcrProcess();
-        await waitForHybrid();
-        console.log("Backend OCR berhasil dinyalakan ulang.");
-      } catch (error) {
-        console.error(`Restart backend OCR gagal: ${error.message}`);
-      }
-    }, 2_000);
-  });
+  return child;
 }
+
+const supervisor =
+  config.hybrid === "off"
+    ? null
+    : createOcrSupervisor({
+        spawnProcess: spawnOcrProcess,
+        checkHealth: () => checkHybridHealth(config.hybridUrl, 2_000),
+        idleMs,
+        restartOnCrash: idleMs === 0,
+      });
 
 async function shutdown(signal) {
   if (stopping) {
@@ -132,26 +99,31 @@ async function shutdown(signal) {
   stopping = true;
   console.log(`\nMenerima ${signal}, menghentikan server...`);
 
-  if (ocrRestartTimer) {
-    clearTimeout(ocrRestartTimer);
-    ocrRestartTimer = null;
-  }
   await server?.close();
-  if (ocrProcess && ocrProcess.exitCode === null) {
-    ocrProcess.kill();
-  }
+  supervisor?.stop();
 }
 
 async function main() {
   config.managedHybrid = true;
-  if (
-    config.hybrid !== "off" &&
-    !(await checkHybridHealth(config.hybridUrl))
-  ) {
-    startOcrProcess();
-    await waitForHybrid();
-  } else if (config.hybrid !== "off") {
-    console.log(`Backend OCR sudah berjalan di ${config.hybridUrl}.`);
+
+  if (config.hybrid !== "off") {
+    // Gagal cepat kalau virtualenv OCR belum ada, termasuk saat mode on-demand.
+    resolvePython();
+
+    if (idleMs > 0) {
+      config.hybridOnDemand = true;
+      config.ensureOcr = () => supervisor.ensure();
+      config.beginOcr = () => supervisor.begin();
+      config.endOcr = () => supervisor.end();
+      console.log(
+        `Backend OCR mode on-demand: dinyalakan saat dipakai, ` +
+          `dimatikan setelah ${idleMinutes} menit idle.`,
+      );
+    } else if (await checkHybridHealth(config.hybridUrl)) {
+      console.log(`Backend OCR sudah berjalan di ${config.hybridUrl}.`);
+    } else {
+      await supervisor.ensure();
+    }
   }
 
   server = await startServer(config);

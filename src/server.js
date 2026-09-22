@@ -106,6 +106,7 @@ export async function buildServer({
       ocrMode: config.hybrid === "off" ? "off" : config.hybridMode ?? "auto",
       forceOcr: config.forceOcr ?? false,
       lowMemoryMode: config.lowMemoryMode ?? false,
+      ocrIdleMinutes: config.ocrIdleMinutes ?? 5,
       ocrLanguage: config.ocrLanguage ?? "english",
       maxFileSizeMb: config.maxFileSizeMb ?? 25,
       aiTimeoutSeconds: (config.aiTimeoutMs ?? 300_000) / 1000,
@@ -487,6 +488,7 @@ export async function buildServer({
             "ocrMode",
             "forceOcr",
             "lowMemoryMode",
+            "ocrIdleMinutes",
             "ocrLanguage",
             "maxFileSizeMb",
             "aiTimeoutSeconds",
@@ -501,6 +503,7 @@ export async function buildServer({
             ocrMode: { type: "string", enum: ["auto", "full", "off"] },
             forceOcr: { type: "boolean" },
             lowMemoryMode: { type: "boolean" },
+            ocrIdleMinutes: { type: "integer", minimum: 0, maximum: 1440 },
             ocrLanguage: { type: "string", minLength: 1, maxLength: 64 },
             maxFileSizeMb: { type: "integer", minimum: 1, maximum: 500 },
             aiTimeoutSeconds: { type: "integer", minimum: 1, maximum: 1800 },
@@ -700,7 +703,7 @@ export async function buildServer({
 
   app.get("/v1/health", async (_request, reply) => {
     const hybridReady =
-      config.hybrid === "off"
+      config.hybrid === "off" || config.hybridOnDemand === true
         ? true
         : await hybridHealth(config.hybridUrl);
 

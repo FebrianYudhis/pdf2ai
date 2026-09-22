@@ -1,8 +1,8 @@
 # PDF2AI
 
-**PDF to AI Ready** — Aplikasi mandiri (*self-hosted*) untuk mengubah PDF digital maupun hasil scan menjadi format Markdown terstruktur yang siap dibaca, dicari, dan diolah oleh model AI.
+**PDF to AI Ready** — Aplikasi mandiri (_self-hosted_) untuk mengubah PDF digital maupun hasil scan menjadi format Markdown terstruktur yang siap dibaca, dicari, dan diolah oleh model AI.
 
-Semua proses ekstraksi PDF dan OCR berjalan secara **lokal** di komputer Anda. Fitur **Tanya AI** bersifat opsional dan kompatibel dengan berbagai provider AI (*OpenAI-compatible*).
+Semua proses ekstraksi PDF dan OCR berjalan secara **lokal** di komputer Anda. Fitur **Tanya AI** bersifat opsional dan kompatibel dengan berbagai provider AI (_OpenAI-compatible_).
 
 ---
 
@@ -16,43 +16,49 @@ Semua proses ekstraksi PDF dan OCR berjalan secara **lokal** di komputer Anda. F
 - 💬 **Tanya AI & Template**: Ajukan pertanyaan langsung ke dokumen hasil ekstraksi menggunakan provider AI pilihan Anda.
 - 🔐 **Keamanan TOTP & API Key**: Login dashboard aman menggunakan kode 6-digit authenticator (tanpa password). Akses API eksternal dilindungi oleh rotasi API Key.
 - 📖 **Dokumentasi API Interaktif**: Dokumentasi terintegrasi langsung di dashboard dalam tampilan **Simple Docs** dan **Scalar API Reference**.
-- 🌓 **Antarmuka Modern & Responsif**: Dashboard bersih dengan dukungan tema terang (*light*) dan gelap (*dark*) otomatis.
+- 🌓 **Antarmuka Modern & Responsif**: Dashboard bersih dengan dukungan tema terang (_light_) dan gelap (_dark_) otomatis.
 - 💾 **Backup & Restore**: Ekspor dan impor konfigurasi serta seluruh data dokumen dalam bentuk arsip ZIP dengan mudah.
 
 ---
 
 ## 📋 Persyaratan Sistem
 
-| Runtime | Kebutuhan Minimum | Rekomendasi |
-| :--- | :--- | :--- |
-| **Node.js** | Versi 20.19.0+ | Versi LTS terbaru |
-| **Java / JDK** | Versi 11+ | JDK 17 atau 21 |
-| **Python** | Python 3.9+ | Python 3.10 / 3.11 |
-| **RAM** | 2 GB (mode hemat memori) | 4 GB+ untuk performa optimal |
+| Runtime        | Kebutuhan Minimum        | Rekomendasi                  |
+| :------------- | :----------------------- | :--------------------------- |
+| **Node.js**    | Versi 20.19.0+           | Versi LTS terbaru            |
+| **Java / JDK** | Versi 11+                | JDK 17 atau 21               |
+| **Python**     | Python 3.9+              | Python 3.10 / 3.11           |
+| **RAM**        | 2 GB (mode hemat memori) | 4 GB+ untuk performa optimal |
 
 ---
 
 ## 🚀 Panduan Cepat (Quick Start)
 
 ### 1. Unduh Kode Aplikasi
+
 ```bash
 git clone https://github.com/FebrianYudhis/pdf2ai.git
 cd pdf2ai
 ```
 
 ### 2. Pasang Komponen & Dependensi
+
 ```bash
 npm install
 npm run setup:ocr
 ```
+
 > [!NOTE]
 > Perintah `npm run setup:ocr` akan membuat virtual environment Python (`.venv`) dan memasang dependensi OCR lokal secara otomatis. Langkah ini hanya perlu dijalankan satu kali saat setup awal.
 
 ### 3. Jalankan Aplikasi
+
 ```bash
 npm start
 ```
+
 Buka browser dan akses:
+
 ```text
 http://127.0.0.1:3000
 ```
@@ -65,15 +71,15 @@ http://127.0.0.1:3000
    - Pindai kode QR yang muncul di layar dengan aplikasi Authenticator (Google Authenticator, Microsoft Authenticator, 2FAS, dll.).
    - Masukkan kode 6 digit untuk aktivasi. Login berikutnya hanya membutuhkan kode TOTP 6 digit.
 2. **Unggah & Antrean Dokumen**:
-   - Tarik (*drag-and-drop*) satu atau beberapa berkas PDF ke area upload.
+   - Tarik (_drag-and-drop_) satu atau beberapa berkas PDF ke area upload.
    - Atur cakupan halaman (**Semua** atau **Kustom**, misal `1-5, 8`) per masing-masing file yang dipilih.
    - Pilih folder tujuan (opsional), lalu klik **Masukkan ke antrean**.
-   - *Tips:* Anda juga dapat mengubah rentang halaman kapan saja saat dokumen masih mengantre via menu opsi (**⋮**) → **Ubah halaman**.
+   - _Tips:_ Anda juga dapat mengubah rentang halaman kapan saja saat dokumen masih mengantre via menu opsi (**⋮**) → **Ubah halaman**.
 3. **Lihat Hasil & Tanya AI**:
-
    - Klik menu tiga titik (⋮) pada kartu dokumen yang sudah berstatus **Selesai**, lalu pilih **Lihat hasil**.
    - Anda dapat melihat PDF asli, metadata ekstraksi, serta menyalin/mengunduh format Markdown.
    - Buka menu **Tanya AI** untuk mulai berdiskusi dengan AI seputar isi dokumen tersebut.
+
 4. **Pengaturan Aplikasi & AI**:
    - Buka menu **Konfigurasi** di pojok kanan atas untuk menghubungkan provider AI (OpenAI, Ollama, Groq, OpenRouter, dll.), mengatur model OCR, mengaktifkan mode hemat memori, dan mengelola API Key.
 
@@ -85,11 +91,13 @@ PDF2AI menyediakan REST API lengkap untuk integrasi dengan aplikasi pihak ketiga
 
 Setelah login ke dashboard, Anda dapat mengakses dokumentasi API terintegrasi:
 
-* **Simple Docs (`/docs`)**: Panduan cepat dan contoh penggunaan API yang ringkas.
-* **Scalar Interactive Docs (`/docs/scalar`)**: Referensi API interaktif berbasis OpenAPI/Swagger. Anda dapat menguji endpoint langsung dari browser dengan memasukkan API Key Anda.
+- **Simple Docs (`/docs`)**: Panduan cepat dan contoh penggunaan API yang ringkas.
+- **Scalar Interactive Docs (`/docs/scalar`)**: Referensi API interaktif berbasis OpenAPI/Swagger. Anda dapat menguji endpoint langsung dari browser dengan memasukkan API Key Anda.
 
 ### Autentikasi API Key
+
 Buat API Key melalui **Konfigurasi → API Key**, lalu kirimkan key tersebut melalui HTTP header:
+
 ```http
 X-API-Key: <KODE_API_KEY_ANDA>
 ```
@@ -100,15 +108,16 @@ X-API-Key: <KODE_API_KEY_ANDA>
 
 Aplikasi dapat dikonfigurasi melalui menu **Konfigurasi** di dashboard atau melalui Environment Variables:
 
-| Variabel | Default | Deskripsi |
-| :--- | :--- | :--- |
-| `PORT` | `3000` | Port server web dan API |
-| `HOST` | `127.0.0.1` | Host binding server |
-| `ODL_OCR_LANG` | `english` | Bahasa model OCR (`english`, `chinese_cht`, dll.) |
-| `ODL_OCR_DEVICE` | `cpu` | Perangkat akselerasi OCR (`cpu`, `cuda`, `mps`, `xpu`) |
-| `ODL_LOW_MEMORY_MODE` | `false` | Batasi RAM & thread untuk komputer berspesifikasi rendah |
-| `ODL_MAX_FILE_SIZE_MB` | `25` | Batas maksimum ukuran file upload (MB) |
-| `APP_SESSION_HOURS` | `12` | Durasi sesi login dashboard (jam) |
+| Variabel               | Default     | Deskripsi                                                              |
+| :--------------------- | :---------- | :--------------------------------------------------------------------- |
+| `PORT`                 | `3000`      | Port server web dan API                                                |
+| `HOST`                 | `127.0.0.1` | Host binding server                                                    |
+| `ODL_OCR_LANG`         | `english`   | Bahasa model OCR (`english`, `chinese_cht`, dll.)                      |
+| `ODL_OCR_DEVICE`       | `cpu`       | Perangkat akselerasi OCR (`cpu`, `cuda`, `mps`, `xpu`)                 |
+| `ODL_LOW_MEMORY_MODE`  | `false`     | Batasi RAM & thread untuk komputer berspesifikasi rendah               |
+| `ODL_OCR_IDLE_MINUTES` | `5`         | Matikan backend OCR setelah sekian menit idle; `0` agar selalu menyala |
+| `ODL_MAX_FILE_SIZE_MB` | `25`        | Batas maksimum ukuran file upload (MB)                                 |
+| `APP_SESSION_HOURS`    | `12`        | Durasi sesi login dashboard (jam)                                      |
 
 ---
 
@@ -124,7 +133,6 @@ npm run server
 # Menjalankan CLI konversi PDF mandiri (mendukung opsi rentang halaman: -p "1-5, 8")
 npm run cli -- "dokumen.pdf" -p "1-5, 8" -o output -f markdown
 
-
 # Menjalankan seluruh rangkaian automated test
 npm test
 ```
@@ -137,24 +145,31 @@ npm test
 <summary><b>Port 3000 sudah digunakan (<code>EADDRINUSE</code>)</b></summary>
 
 Gunakan port lain dengan mengatur variabel `PORT`:
+
 ```bash
 PORT=3001 npm start
 ```
+
 </details>
 
 <details>
 <summary><b>OCR Kehabisan Memori (<code>std::bad_alloc</code>) pada RAM Terbatas</b></summary>
 
 Aktifkan **Mode hemat memori** di **Konfigurasi → Aplikasi**, atau jalankan dengan perintah:
+
 ```bash
 ODL_LOW_MEMORY_MODE=true npm start
 ```
+
+RAM juga turun sendiri saat backend OCR tidak dipakai: proses Python dimatikan setelah 5 menit idle dan dinyalakan lagi saat ada dokumen berikutnya. Atur durasinya di **Konfigurasi → Aplikasi → Waktu & sesi** (atau `ODL_OCR_IDLE_MINUTES`); isi `0` agar backend selalu menyala.
+
 </details>
 
 <details>
 <summary><b>Perangkat Authenticator Hilang</b></summary>
 
 Hentikan server (`Ctrl+C`), hapus berkas `data/auth.json`, lalu jalankan kembali `npm start`. Anda akan diminta melakukan setup autentikator baru di browser.
+
 </details>
 
 ---

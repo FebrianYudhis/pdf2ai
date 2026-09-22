@@ -5,14 +5,23 @@ import {
   normalizeApplicationSettings,
 } from "./application-config.js";
 
-function numberFromEnv(environment, name, fallback) {
+function numberFromEnv(
+  environment,
+  name,
+  fallback,
+  minimum = Number.MIN_VALUE,
+) {
   const value = environment[name];
   if (value === undefined) {
     return fallback;
   }
   const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(`${name} harus berupa angka positif.`);
+  if (!Number.isFinite(parsed) || parsed < minimum) {
+    throw new Error(
+      minimum > 0
+        ? `${name} harus berupa angka positif.`
+        : `${name} harus bernilai minimal ${minimum}.`,
+    );
   }
   return parsed;
 }
@@ -96,6 +105,7 @@ export function loadConfig({ environment = process.env, appConfigFile } = {}) {
     ["ocrMode", environment.ODL_HYBRID !== undefined ? "ODL_HYBRID" : "ODL_HYBRID_MODE"],
     ["forceOcr", "ODL_FORCE_OCR"],
     ["lowMemoryMode", "ODL_LOW_MEMORY_MODE"],
+    ["ocrIdleMinutes", "ODL_OCR_IDLE_MINUTES"],
     ["ocrLanguage", "ODL_OCR_LANG"],
     ["maxFileSizeMb", "ODL_MAX_FILE_SIZE_MB"],
     ["aiTimeoutSeconds", "APP_AI_TIMEOUT_MS"],
@@ -111,6 +121,12 @@ export function loadConfig({ environment = process.env, appConfigFile } = {}) {
       environment,
       "ODL_LOW_MEMORY_MODE",
       storedSettings.lowMemoryMode,
+    ),
+    ocrIdleMinutes: numberFromEnv(
+      environment,
+      "ODL_OCR_IDLE_MINUTES",
+      storedSettings.ocrIdleMinutes,
+      0,
     ),
     ocrLanguage: environment.ODL_OCR_LANG ?? storedSettings.ocrLanguage,
     maxFileSizeMb: numberFromEnv(
@@ -139,6 +155,7 @@ export function loadConfig({ environment = process.env, appConfigFile } = {}) {
     ocrDevice: effectiveSettings.ocrDevice,
     forceOcr: effectiveSettings.forceOcr,
     lowMemoryMode: effectiveSettings.lowMemoryMode,
+    ocrIdleMinutes: effectiveSettings.ocrIdleMinutes,
     ocrLanguage: effectiveSettings.ocrLanguage,
     hybridUrl: environment.ODL_HYBRID_URL ?? "http://127.0.0.1:5002",
     hybridTimeout: environment.ODL_HYBRID_TIMEOUT ?? "0",

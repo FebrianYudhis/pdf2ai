@@ -599,8 +599,8 @@
                 </section>
 
                 <section class="settings-card">
-                  <div class="settings-card-heading"><span class="settings-icon">03</span><div><h4>Waktu &amp; sesi</h4><p>Batas tunggu provider dan login.</p></div></div>
-                  <div class="settings-fields"><label class="form-field"><span>Timeout jawaban AI</span><div class="input-suffix"><input id="app-ai-timeout" type="number" min="1" max="1800" step="1" /><span>detik</span></div><small>Rentang 1–1800 detik.</small></label><label class="form-field"><span>Durasi sesi dashboard</span><div class="input-suffix"><input id="app-session-hours" type="number" min="1" max="168" step="1" /><span>jam</span></div><small>Berlaku untuk sesi login baru.</small></label></div>
+                  <div class="settings-card-heading"><span class="settings-icon">03</span><div><h4>Waktu &amp; sesi</h4><p>Batas tunggu provider, login, dan idle OCR.</p></div></div>
+                  <div class="settings-fields"><label class="form-field"><span>Timeout jawaban AI</span><div class="input-suffix"><input id="app-ai-timeout" type="number" min="1" max="1800" step="1" /><span>detik</span></div><small>Rentang 1–1800 detik.</small></label><label class="form-field"><span>Durasi sesi dashboard</span><div class="input-suffix"><input id="app-session-hours" type="number" min="1" max="168" step="1" /><span>jam</span></div><small>Berlaku untuk sesi login baru.</small></label><label class="form-field"><span>Idle sebelum OCR dimatikan</span><div class="input-suffix"><input id="app-ocr-idle-minutes" type="number" min="0" max="1440" step="1" /><span>menit</span></div><small>Backend OCR dimatikan setelah idle selama ini agar RAM kembali lega; <code>0</code> berarti selalu menyala.</small></label></div>
                 </section>
               </div>
               <div class="environment-overrides" id="app-environment-overrides" hidden></div>

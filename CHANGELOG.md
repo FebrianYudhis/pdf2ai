@@ -4,6 +4,22 @@ Semua perubahan penting PDF2AI dicatat dalam file ini. Format mengikuti
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) dan versi mengikuti
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-09-22
+
+### Added
+
+- Fitur **Backend OCR On-Demand & Idle Shutdown**:
+  - Backend OCR tidak lagi dinyalakan saat startup. Proses Python menyala hanya ketika ada dokumen yang memerlukan konversi, lalu dimatikan otomatis setelah idle sehingga RAM kembali ke level proses Node saja.
+  - Ambang idle dapat diubah dari dashboard (**Konfigurasi → Aplikasi → Waktu & sesi**) dan tersimpan di `data/app-config.json` sebagai `ocrIdleMinutes`, serta tetap dapat diatur lewat environment variable `ODL_OCR_IDLE_MINUTES` (default `5` menit, `0` agar backend selalu menyala).
+  - Supervisor proses OCR baru ([`src/ocr-supervisor.js`](src/ocr-supervisor.js)): mencegah spawn ganda, menunggu `/health` siap sebelum konversi, dan tetap menyalakan ulang otomatis ketika crash pada mode selalu-menyala.
+  - Rangkaian pengujian unit untuk siklus hidup supervisor di [`test/ocr-supervisor.test.js`](test/ocr-supervisor.test.js).
+
+### Changed
+
+- `npm start` tidak lagi menunggu backend OCR siap sebelum dashboard dibuka, sehingga waktu startup lebih singkat.
+- Endpoint `/v1/health` melaporkan `hybridReady: true` saat backend sedang dimatikan karena idle, agar status dashboard tidak menyesatkan.
+- Aktivitas konversi di [`src/server-ocr.js`](src/server-ocr.js) menahan idle shutdown selama job berjalan dan mencoba menyalakan backend lebih dulu sebelum jatuh ke jalur pemulihan.
+
 ## [1.10.0] - 2026-08-27
 
 ### Added

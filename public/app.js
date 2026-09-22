@@ -1115,6 +1115,7 @@ const applicationFieldLabels = {
   ocrMode: "strategi ekstraksi",
   forceOcr: "paksa OCR",
   lowMemoryMode: "mode hemat memori",
+  ocrIdleMinutes: "idle shutdown OCR",
   ocrLanguage: "bahasa OCR",
   maxFileSizeMb: "batas ukuran PDF",
   aiTimeoutSeconds: "timeout AI",

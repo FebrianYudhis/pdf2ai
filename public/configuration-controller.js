@@ -82,6 +82,7 @@ export function createConfigurationController({
     elements.appOcrMode.value = settings.ocrMode;
     elements.appForceOcr.checked = settings.forceOcr;
     elements.appLowMemoryMode.checked = settings.lowMemoryMode;
+    elements.appOcrIdleMinutes.value = settings.ocrIdleMinutes;
     elements.appOcrLanguage.value = settings.ocrLanguage;
     elements.appMaxFileSize.value = settings.maxFileSizeMb;
     elements.appAiTimeout.value = settings.aiTimeoutSeconds;
@@ -136,6 +137,7 @@ export function createConfigurationController({
       ocrMode: elements.appOcrMode.value,
       forceOcr: elements.appForceOcr.checked,
       lowMemoryMode: elements.appLowMemoryMode.checked,
+      ocrIdleMinutes: Number(elements.appOcrIdleMinutes.value),
       ocrLanguage: elements.appOcrLanguage.value.trim(),
       maxFileSizeMb: Number(elements.appMaxFileSize.value),
       aiTimeoutSeconds: Number(elements.appAiTimeout.value),
@@ -146,6 +148,7 @@ export function createConfigurationController({
   async function saveApplicationConfig() {
     const controls = [
       elements.appOcrLanguage,
+      elements.appOcrIdleMinutes,
       elements.appMaxFileSize,
       elements.appAiTimeout,
       elements.appSessionHours,

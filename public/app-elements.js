@@ -90,6 +90,7 @@ export const elements = {
   appForceOcr: document.querySelector("#app-force-ocr"),
   appForceOcrWrapper: document.querySelector("#app-force-ocr-wrapper"),
   appLowMemoryMode: document.querySelector("#app-low-memory-mode"),
+  appOcrIdleMinutes: document.querySelector("#app-ocr-idle-minutes"),
   appOcrLanguage: document.querySelector("#app-ocr-language"),
   appOcrLanguageHelp: document.querySelector("#app-ocr-language-help"),
   appMaxFileSize: document.querySelector("#app-max-file-size"),

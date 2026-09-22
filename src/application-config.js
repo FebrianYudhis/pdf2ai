@@ -8,6 +8,7 @@ export const DEFAULT_APPLICATION_SETTINGS = Object.freeze({
   ocrMode: "auto",
   forceOcr: false,
   lowMemoryMode: false,
+  ocrIdleMinutes: 5,
   ocrLanguage: "english",
   maxFileSizeMb: 25,
   aiTimeoutSeconds: 300,
@@ -54,6 +55,13 @@ export function normalizeApplicationSettings(input = {}) {
     ocrMode: settings.ocrMode,
     forceOcr: settings.ocrMode === "off" ? false : settings.forceOcr,
     lowMemoryMode: settings.lowMemoryMode,
+    ocrIdleMinutes: finiteNumber(
+      settings.ocrIdleMinutes,
+      "Ambang idle OCR",
+      0,
+      1440,
+      true,
+    ),
     ocrLanguage,
     maxFileSizeMb: finiteNumber(
       settings.maxFileSizeMb,

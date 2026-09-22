@@ -67,6 +67,7 @@ test("konfigurasi aplikasi persisten dimuat saat startup", async () => {
     ocrMode: "full",
     forceOcr: true,
     lowMemoryMode: true,
+    ocrIdleMinutes: 30,
     ocrLanguage: "english",
     maxFileSizeMb: 64,
     aiTimeoutSeconds: 420,
@@ -78,9 +79,38 @@ test("konfigurasi aplikasi persisten dimuat saat startup", async () => {
   assert.equal(config.hybridMode, "full");
   assert.equal(config.forceOcr, true);
   assert.equal(config.lowMemoryMode, true);
+  assert.equal(config.ocrIdleMinutes, 30);
   assert.equal(config.maxFileSizeMb, 64);
   assert.equal(config.aiTimeoutMs, 420_000);
   assert.equal(config.sessionHours, 36);
+});
+
+test("ODL_OCR_IDLE_MINUTES menimpa setting aplikasi dan menerima nilai 0", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "pdf2ai-idle-config-test-"));
+  const appConfigFile = join(directory, "app-config.json");
+  await saveApplicationSettings(appConfigFile, {
+    ocrDevice: "cpu",
+    ocrMode: "auto",
+    forceOcr: false,
+    lowMemoryMode: false,
+    ocrIdleMinutes: 30,
+    ocrLanguage: "english",
+    maxFileSizeMb: 25,
+    aiTimeoutSeconds: 300,
+    sessionHours: 12,
+  });
+
+  const stored = loadConfig({ environment: {}, appConfigFile });
+  assert.equal(stored.ocrIdleMinutes, 30);
+
+  const overridden = loadConfig({
+    environment: { ODL_OCR_IDLE_MINUTES: "0" },
+    appConfigFile,
+  });
+  assert.equal(overridden.ocrIdleMinutes, 0);
+  assert.deepEqual(overridden.applicationEnvironmentOverrides, [
+    { field: "ocrIdleMinutes", variable: "ODL_OCR_IDLE_MINUTES" },
+  ]);
 });
 
 test("konfigurasi aplikasi disimpan dan menandai perubahan yang perlu restart", async (t) => {
@@ -100,6 +130,7 @@ test("konfigurasi aplikasi disimpan dan menandai perubahan yang perlu restart", 
     ocrMode: "full",
     forceOcr: true,
     lowMemoryMode: true,
+    ocrIdleMinutes: 15,
     ocrLanguage: "english",
     maxFileSizeMb: 80,
     aiTimeoutSeconds: 600,

@@ -69,6 +69,13 @@ export async function extractMarkdown(path, config, options = {}) {
           : config.hybridTimeout,
     });
   const runOpenDataLoader = async (hybridMode) => {
+    // Best-effort: nyalakan backend on-demand sebelum konversi. Kegagalan di
+    // sini dibiarkan, karena dokumen ber-text-layer tidak butuh backend.
+    await config.ensureOcr?.().catch(() => {});
+
+    // Selama konversi berjalan, idle stop ditahan agar backend tidak dimatikan
+    // di tengah job yang panjang.
+    config.beginOcr?.();
     try {
       return await convertOnce(hybridMode);
     } catch (error) {
@@ -76,13 +83,16 @@ export async function extractMarkdown(path, config, options = {}) {
         config.managedHybrid === true &&
         config.hybrid !== "off" &&
         !(await checkHybridHealth(config.hybridUrl));
-      if (
-        !backendStopped ||
-        !(await waitForHybridRecovery(config.hybridUrl))
-      ) {
+      if (!backendStopped) {
         throw error;
       }
-      return convertOnce(hybridMode);
+      await config.ensureOcr?.();
+      if (!(await waitForHybridRecovery(config.hybridUrl))) {
+        throw error;
+      }
+      return await convertOnce(hybridMode);
+    } finally {
+      config.endOcr?.();
     }
   };
 
